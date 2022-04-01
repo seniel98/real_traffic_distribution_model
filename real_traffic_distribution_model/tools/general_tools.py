@@ -9,9 +9,9 @@ from xml.etree import ElementTree
 import pandas as pd
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
-sys.path.append("/")
+sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
-import real_traffic_distribution_model as main
+import real_traffic_distribution_model as rtdm
 
 # Global variables
 edge_id_s = ""
@@ -120,8 +120,7 @@ def distance_2_points(lat_a, lon_a, lat_b, lon_b):
     """
     return round(((6372.137 * math.acos((math.sin(math.radians(lat_a)) * math.sin(math.radians(lat_b))) + (
             math.cos(math.radians(lat_a)) * math.cos(math.radians(lat_b)) * math.cos(
-                math.radians(lon_a) - math.radians(lon_b))))) * 1000), 2)
-
+        math.radians(lon_a) - math.radians(lon_b))))) * 1000), 2)
 
 
 def mail_notification(now, finish, message_mail):
@@ -134,7 +133,7 @@ def mail_notification(now, finish, message_mail):
     """
     # os.system('\n echo "GenerateDataBase.py has\n started:\n Time: %s\n finished:\n Time: %s \n %s \n Greeting from your computer" | /usr/bin/mutt -s "Script finished in %s" jorgenluis004@hotmail.com'%(str(now), str(finish),messageMail,socket.gethostname()))
     os.system(
-        '\n echo "linkABATIS_main.py has\n started:\n Time: %s\n finished:\n Time: %s \n\n %s \n\n\n Greeting from your computer" | mutt -s "Script finished in %s" jdpadron98@gmail.com' % (
+        '\n echo "linkABATIS_rtdm.py has\n started:\n Time: %s\n finished:\n Time: %s \n\n %s \n\n\n Greeting from your computer" | mutt -s "Script finished in %s" jdpadron98@gmail.com' % (
             str(now), str(finish), message_mail, socket.gethostname()))
 
 
@@ -165,7 +164,7 @@ def fix_edges_broken(options, db, edges, edges_broken_list):
         else:
             edge_b = edges[edges_broken_list[i] + 1]
 
-        result_row = (main.get_route_from_external_source(options, edge_a, edge_b))
+        result_row = (rtdm.get_route_from_external_source(options, edge_a, edge_b))
         if result_row != 'totalFailed':
             edges_founded = (
                 result_row[(result_row.index(edge_a) + len(edge_a) + 1):(result_row.index(edge_b) - 1)]).split(
@@ -187,7 +186,7 @@ def fix_edges_broken(options, db, edges, edges_broken_list):
             else:
                 new_edges.append(edges.values()[i])
     else:
-        new_edges = (main.get_route_from_external_source(
+        new_edges = (rtdm.get_route_from_external_source(
             options, edge_id_s, edge_id_d)).split(' ')
     return new_edges
 
@@ -234,25 +233,25 @@ def edges_from_ABATIS(options, route_id):
         edges = edge_id_s
     else:
 
-        coor = main.edge_to_coordinates(options, sqlite3.connect(
+        coor = rtdm.edge_to_coordinates(options, sqlite3.connect(
             options.dbPath), edge_id_s, edge_id_d)
 
         try:
             # request to ABATIS a route
             # rutas obtenidas en array
 
-            coor_array = main.get_coordinates(options, coor[coor.index(',') + 1:coor.index('|')],
-                                              coor[:coor.index(',')], coor[coor.rindex(',') + 1:],
-                                              coor[coor.index('|') + 1:coor.rindex(',')])
+            coor_array = rtdm.get_route_from_ABATIS(options, coor[coor.index(',') + 1:coor.index('|')],
+                                                    coor[:coor.index(',')], coor[coor.rindex(',') + 1:],
+                                                    coor[coor.index('|') + 1:coor.rindex(',')])
             # time.sleep(1)
-            edges_array = main.coordinates_to_edge(
+            edges_array = rtdm.coordinates_to_edge(
                 options, sqlite3.connect(options.dbPath), coor_array)
             if (check_order_route(options, sqlite3.connect(options.dbPath), edges_array)) and len(edges_array) > 0:
                 edges = ' '.join(str(x) for x in edges_array)
             else:
                 # get from external source because in sometimes matching the same coordinate, it's the last resource
                 print("aqui")
-                edges = main.get_route_from_external_source(
+                edges = rtdm.get_route_from_external_source(
                     options, edge_id_s, edge_id_d)
         except Exception as e:
             edges = edge_exception(options, route_id)

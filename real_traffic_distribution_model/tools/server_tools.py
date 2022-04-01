@@ -5,9 +5,9 @@ import subprocess  # For executing a shell command
 import sys
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
-sys.path.append("/")
+sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
-import real_traffic_distribution_model as main
+import real_traffic_distribution_model as rtdm
 
 # Global variables
 username = socket.gethostname()
@@ -23,13 +23,13 @@ def ABATIS_update_traffic(is_remote, options):
     if not is_remote:
         # Copy a file generate that contains a traffic update_specific_traffic_csv
         os.system("cp %s /home/josedaniel/osrm-backend/build" %
-                  main.update_specific_traffic_csv)
+                  rtdm.update_specific_traffic_csv)
         # Update ABATIS Server
         os.system("'startABATIS_MLD'")
     else:
         # Copy a file generate that contains a traffic update_specific_traffic_csv
         os.system("scp %s josedaniel@%s:/home/josedaniel/osrm-backend/build" % (
-            main.update_specific_traffic_csv, options.ip))
+            rtdm.update_specific_traffic_csv, options.ip))
         # It's for update in ABATIS Server
         os.system("ssh %s 'startABATIS_MLD'" % options.ip)
 

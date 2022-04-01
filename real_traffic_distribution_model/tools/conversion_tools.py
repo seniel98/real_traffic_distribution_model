@@ -1,9 +1,9 @@
 import sys
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
-sys.path.append("/")
+sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
-import real_traffic_distribution_model as main
+import real_traffic_distribution_model as rtdm
 
 
 def segment_id_into_edges(options, db, edge_id):
@@ -169,12 +169,12 @@ def coordinates_to_edge(options, db, coor_array):
             nodes_vector.append(node)
     new_nodes = {}
     for i in range(0, len(nodes_vector) - 1):
-        edge = main.is_edge(
+        edge = rtdm.is_edge(
             options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
         if edge == '0':
-            nodes = main.get_to_from_edge(options, db, nodes_vector[i][0])
+            nodes = rtdm.get_to_from_edge(options, db, nodes_vector[i][0])
             for j in range(0, len(nodes)):
-                if nodes_vector[i + 1][0] in main.get_to_from_edge(options, db, nodes[j]):
+                if nodes_vector[i + 1][0] in rtdm.get_to_from_edge(options, db, nodes[j]):
                     new_nodes[nodes_vector[i][0]] = nodes[j]
 
     for key, value in new_nodes.items():
@@ -185,7 +185,7 @@ def coordinates_to_edge(options, db, coor_array):
     edges_broken_index = []
 
     for i in range(0, len(nodes_vector) - 1):
-        edge = main.is_edge(
+        edge = rtdm.is_edge(
             options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
         if edge == '0':
             edges[i] = edge
@@ -210,7 +210,7 @@ def coordinates_to_edge(options, db, coor_array):
         for i in range(0, len(edges)):
             if edges[i] == '0':
                 edges_broken_index.append(i)
-        final_edges = main.fix_edges_broken(
+        final_edges = rtdm.fix_edges_broken(
             options, db, edges, edges_broken_index)
     else:
         for value in edges.items():

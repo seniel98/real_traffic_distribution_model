@@ -9,9 +9,9 @@ from urllib.request import urlopen
 from xml.etree import ElementTree
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
-sys.path.append("/")
+sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
-import real_traffic_distribution_model as main
+import real_traffic_distribution_model as rtdm
 
 
 def get_time_traveled_by_equation(options, segment_id, x, db):
@@ -92,7 +92,7 @@ def get_edges_id_initials(options, db):
     edges_id_array = []
     for i in range(0, len(result_row_current)):
         edges_id_array.append(str(result_row_current[i][0]))
-        main.update_progress(
+        rtdm.update_progress(
             i + 2, len(result_row_current), 'EdgesIdInitials...')
     return edges_id_array
 
@@ -117,7 +117,7 @@ def get_vehicles_real_depart_info(options, edges_id_initials_array, db):
         cursor.execute(sql_sentence)
         result_row_current = cursor.fetchall()
         edges_id_array.append(result_row_current)
-        main.update_progress(i + 2, len(edges_id_initials_array),
+        rtdm.update_progress(i + 2, len(edges_id_initials_array),
                              'VehiclesRealDepartInfo...')
         # for j in range(0, len(result_rowCurrent)):edgesIdArray.append(str(result_rowCurrent[j]))
     return edges_id_array
@@ -205,7 +205,7 @@ def get_edges_id_initials_congestion(options, db, num_repetition):
     edges_id_array = []
     for i in range(0, len(result_row_current)):
         edges_id_array.append(str(result_row_current[i][0]))
-        main.update_progress(
+        rtdm.update_progress(
             i + 2, len(result_row_current), 'EdgesIdInitials...')
     return edges_id_array
 
@@ -231,7 +231,7 @@ def get_vehicles_real_depart_info_congestion(options, edges_id_initials_array, d
         cursor.execute(sql_sentence)
         result_row_current = cursor.fetchall()
         edges_id_array.append(result_row_current)
-        main.update_progress(i + 2, len(edges_id_initials_array),
+        rtdm.update_progress(i + 2, len(edges_id_initials_array),
                              'VehiclesRealDepartInfo...')
     # for j in range(0, len(result_rowCurrent)):edgesIdArray.append(str(result_rowCurrent[j]))
     return edges_id_array
@@ -252,9 +252,9 @@ def get_num_vehicles_way(options, way_name=None, additional=False, eco=True, sim
     vehicles_vector_total = []
     way_id_list = []
     if not eco:
-        way_id_list = main.find_id_way(options, way_name)
+        way_id_list = rtdm.find_id_way(options, way_name)
     else:
-        way_id_list = main.find_id_way(options, way_name, eco)
+        way_id_list = rtdm.find_id_way(options, way_name, eco)
     cursor = db.cursor()
     k = 0
 
@@ -316,7 +316,7 @@ def get_vehicles_real_depart_info_congestion_eco(options, edges_id_initials_arra
         cursor.execute(sql_sentence)
         result_row_current = cursor.fetchall()
         edges_id_array.append(result_row_current)
-        main.update_progress(i + 2, len(edges_id_initials_array),
+        rtdm.update_progress(i + 2, len(edges_id_initials_array),
                              'VehiclesRealDepartInfo...')
     # for j in range(0, len(result_rowCurrent)):edgesIdArray.append(str(result_rowCurrent[j]))
     return edges_id_array
@@ -491,7 +491,7 @@ def get_route_from_external_source(options, edge_a, edge_b):
     return route
 
 
-def get_coordinates(options, lon1, lat1, lon2, lat2):
+def get_route_from_ABATIS(options, lon1, lat1, lon2, lat2):
     """The function connect with ABATIS and get the route between two given coordinates
 
     Args:

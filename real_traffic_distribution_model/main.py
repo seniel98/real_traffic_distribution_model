@@ -3,6 +3,7 @@ import sys
 from optparse import OptionParser
 import database
 import tools
+import traffic_model as tm
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,6 +32,8 @@ def get_options():
                          help="define the input additional filename")
     optParser.add_option("-d", "--db", dest="dbPath",
                          default="traffic_data.db", help="Name of a database")
+    optParser.add_option("-t", dest="traffic_file",
+                         help="CSV with the information of the traffic")
     optParser.add_option("--useTool", dest="useTool",
                          action="store_true", help="Mode Use Tool(mandatory)")
     optParser.add_option("-i", "--ip", dest="ip",
@@ -61,16 +64,18 @@ def get_options():
                          help="Csv with the names of the streets to modify weight")
     optParser.add_option("--alpha", dest="alpha",
                          help="Parameter that influence on the weight of the road and its speed value")
+    optParser.add_option("--generate_routes", dest="generate_routes",
+                         help="Generate the o-d matrix for the traffic data")
 
     (options, args) = optParser.parse_args()
 
-    link_ABATIS_actions(options)
+    main_actions(options)
 
     return options
 
 
-def link_ABATIS_actions(options):
-    """The function retrieves data from command line and executes the actions of linkABATIS
+def main_actions(options):
+    """The function retrieves data from command line and executes the actions
 
     Args:
         options (options): Options retrieved from the command line
@@ -78,20 +83,18 @@ def link_ABATIS_actions(options):
     if options.startABATIS and options.ip and options.port:
         tools.start_ABATIS(options)
     else:
-        if (tools.server_is_alive(options)) and (tools.port_is_alive(options)):
-            if (
-                    options.createDB and options.osmfile and options.netfile):
-
+        if tools.server_is_alive(options) and tools.port_is_alive(options):
+            if options.createDB and options.osmfile and options.netfile:
                 database.create(options)
                 database.insert_data(options)
 
+            elif options.generate_routes and options.traffic_file and options.osmfile:
+                tm.create_od_routes(options)
 
             else:
-                optParser.error(
-                    'Command incomplete, please check again or use -h for help')
+                optParser.error('Command incomplete, please check again or use -h for help')
         else:
-            optParser.error(
-                'Server is not alive!!, please check again or use -h for help')
+            optParser.error('Server is not alive!!, please check again or use -h for help')
 
 
 ############################

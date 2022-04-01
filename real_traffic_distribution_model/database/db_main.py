@@ -3,9 +3,9 @@ import sqlite3
 import sys
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
-sys.path.append("/")
+sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
-import real_traffic_distribution_model as main
+import real_traffic_distribution_model as rtdm
 
 
 def create(options):
@@ -44,14 +44,14 @@ def insert_data(options):
 
     db = sqlite3.connect(options.dbPath)
 
-    main.insert_nodes(options, db)
+    rtdm.insert_nodes(options, db)
 
-    main.insert_edge_type(options, db)
+    rtdm.insert_edge_type(options, db)
 
-    main.insert_edges(options, db)
+    rtdm.insert_edges(options, db)
 
-    #main.insert_routes(options, db)
+    #rtdm.insert_routes(options, db)
 
-    #main.insert_vehicles(options, db)
+    #rtdm.insert_vehicles(options, db)
 
     db.close()

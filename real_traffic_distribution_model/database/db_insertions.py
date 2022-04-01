@@ -5,9 +5,9 @@ import sys
 from xml.etree import ElementTree
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
-sys.path.append("/")
+sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
-import real_traffic_distribution_model as main
+import real_traffic_distribution_model as rtdm
 
 
 def insert_nodes(options, db):
@@ -34,7 +34,7 @@ def insert_nodes(options, db):
             node_inner_list = (
                 node.attrib['id'], node.attrib['lat'], node.attrib['lon'])
             nodes_list.append(node_inner_list)
-            main.update_progress(j + 1, len(nodes_used_vector),
+            rtdm.update_progress(j + 1, len(nodes_used_vector),
                                  'Inserting Nodes into DB')
 
     db.executemany("INSERT INTO nodes(id,lat,lon) VALUES(?,?,?);", nodes_list)
@@ -83,10 +83,10 @@ def insert_edges(options, db):
         if edge.get("from"):
             edge_id_vector.append(edge.attrib['id'])
             j = j + 1
-            main.update_progress(
+            rtdm.update_progress(
                 j + 1, len(document_net_file.findall('edge')), 'Loading Edge File')
 
-    edge_id_vector_natural_sorted = sorted(edge_id_vector, key=main.natural_key)
+    edge_id_vector_natural_sorted = sorted(edge_id_vector, key=rtdm.natural_key)
     j = 0
 
     for i in range(0, len(edge_id_vector_natural_sorted)):
@@ -111,19 +111,19 @@ def insert_edges(options, db):
                                     for t in way.findall('tag'):
                                         if t.attrib['k'] == 'tracktype':
                                             if (t.attrib['v']) == 'grade1':
-                                                speed_original = main.kmph_to_mps(
+                                                speed_original = rtdm.kmph_to_mps(
                                                     60)
                                             if (t.attrib['v']) == 'grade2':
-                                                speed_original = main.kmph_to_mps(
+                                                speed_original = rtdm.kmph_to_mps(
                                                     40)
                                             if (t.attrib['v']) == 'grade3':
-                                                speed_original = main.kmph_to_mps(
+                                                speed_original = rtdm.kmph_to_mps(
                                                     30)
                                             if (t.attrib['v']) == 'grade4':
-                                                speed_original = main.kmph_to_mps(
+                                                speed_original = rtdm.kmph_to_mps(
                                                     25)
                                             if (t.attrib['v']) == 'grade5':
-                                                speed_original = main.kmph_to_mps(
+                                                speed_original = rtdm.kmph_to_mps(
                                                     20)
 
                         edge_inner_list = (
@@ -133,13 +133,13 @@ def insert_edges(options, db):
                         edge_list.append(edge_inner_list)
                     else:
                         edge_inner_list = (edge.attrib['id'], edge.attrib['from'], edge.attrib['to'],
-                                           main.original_speed_from_ABATIS_default(options, db,
+                                           rtdm.original_speed_from_ABATIS_default(options, db,
                                                                                    ((edge.attrib['type'])[
                                                                                     (
                                                                                         edge.attrib[
                                                                                             'type']).index(
                                                                                         '.') + 1:])),
-                                           main.original_speed_from_ABATIS_default(options, db,
+                                           rtdm.original_speed_from_ABATIS_default(options, db,
                                                                                    ((edge.attrib['type'])[
                                                                                     (
                                                                                         edge.attrib[
@@ -149,7 +149,7 @@ def insert_edges(options, db):
                                            (edge.attrib['type'])[(edge.attrib['type']).index('.') + 1:])
                         default_edge_list.append(edge_inner_list)
                     j = j + 1
-                    main.update_progress(
+                    rtdm.update_progress(
                         j + 1, len(edge_id_vector_natural_sorted), 'Inserting Edge into DB')
     db.executemany(
         "INSERT INTO edges(id,[from],[to],speedOriginal, speedUpdated, length,edgeType) VALUES(?,?,?,?,?,?,?);",
@@ -177,7 +177,7 @@ def insert_routes(options, db):
         i = i + 1
         routes_inner_list = (routes.attrib['id'], routes.attrib['edges'])
         routes_list.append(routes_inner_list)
-        main.update_progress(i, len(document_route_file.findall(
+        rtdm.update_progress(i, len(document_route_file.findall(
             'route')), 'Inserting routes into DB')
     db.executemany("INSERT INTO routes(id,route) VALUES(?,?);", routes_list)
     db.commit()
@@ -200,7 +200,7 @@ def insert_vehicles(options, db):
             vehicle.attrib['id'], vehicle.attrib['depart'], vehicle.attrib['departLane'], vehicle.attrib['departPos'],
             vehicle.attrib['departSpeed'], vehicle.attrib['route'])
         vehicles_list.append(vehicle_inner_list)
-        main.update_progress(i, len(document_additional_file.findall(
+        rtdm.update_progress(i, len(document_additional_file.findall(
             'vehicle')), 'Inserting vehicles into DB')
     db.executemany("INSERT INTO vehicles(id,depart,departLane,departPos,departSpeed,route) VALUES(?,?,?,?,?,?);",
                    vehicles_list)
@@ -229,7 +229,7 @@ def insert_congestion(options):
                           (os.getcwd(), options.dbPath, options.numextravehicles))
     db = sqlite3.connect(new_path_data_base)
     cursor = db.cursor()
-    array_routes = main.get_routes(db)
+    array_routes = rtdm.get_routes(db)
 
     sql_sentence = 'SELECT name FROM sqlite_master WHERE type="table" AND name="vehiclesAdditional";'
     cursor.execute(sql_sentence)
@@ -254,7 +254,7 @@ def insert_congestion(options):
                         (round((float(time_random[j]) / float(1000)), 2))), "best", "random_free", "max",
                     (array_routes[i][0]))
                 vehicle_learning_list.append(vehicle_learning_inner_list)
-                main.update_progress(i + 1, len(array_routes),
+                rtdm.update_progress(i + 1, len(array_routes),
                                      'Inserting congestion...')
         db.executemany(
             'INSERT INTO vehiclesAdditional(id,depart,departLane,departPos,departSpeed,route) VALUES(?,?,?,?,?,?);',
