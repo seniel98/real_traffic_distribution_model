@@ -107,7 +107,7 @@ def median(data):
 
 
 def distance_2_points(lat_a, lon_a, lat_b, lon_b):
-    """The function gets the distance between two points expressed in km, with an error of 0.3%
+    """The function gets the distance between two points expressed in m, with an error of 0.3%
 
     Args:
         lat_a (float): The latitude of point a
@@ -116,7 +116,7 @@ def distance_2_points(lat_a, lon_a, lat_b, lon_b):
         lon_b (float): The longitude of point b
 
     Returns:
-        int: The distance between two given coordinates
+        float: The distance between two given coordinates
     """
     return round(((6372.137 * math.acos((math.sin(math.radians(lat_a)) * math.sin(math.radians(lat_b))) + (
             math.cos(math.radians(lat_a)) * math.cos(math.radians(lat_b)) * math.cos(

@@ -30,10 +30,10 @@ def get_options():
                          help="define the input route filename")
     optParser.add_option("-a", "--additional-file", dest="additionalfile",
                          help="define the input additional filename")
+    optParser.add_option("-t", "--traffic_file", dest="traffic_file",
+                         help="CSV with the information of the traffic")
     optParser.add_option("-d", "--db", dest="dbPath",
                          default="traffic_data.db", help="Name of a database")
-    optParser.add_option("-t", dest="traffic_file",
-                         help="CSV with the information of the traffic")
     optParser.add_option("--useTool", dest="useTool",
                          action="store_true", help="Mode Use Tool(mandatory)")
     optParser.add_option("-i", "--ip", dest="ip",
@@ -84,11 +84,12 @@ def main_actions(options):
         tools.start_ABATIS(options)
     else:
         if tools.server_is_alive(options) and tools.port_is_alive(options):
+
             if options.createDB and options.osmfile and options.netfile:
                 database.create(options)
                 database.insert_data(options)
 
-            elif options.generate_routes and options.traffic_file and options.osmfile:
+            elif options.generate_routes:
                 tm.create_od_routes(options)
 
             else:

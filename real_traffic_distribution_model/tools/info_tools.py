@@ -491,6 +491,24 @@ def get_route_from_external_source(options, edge_a, edge_b):
     return route
 
 
+def get_coord_from_node(db, node_id):
+    """The function get the coordinates of a given node
+
+  Args:
+      db (db): The database
+      node_id (str): The node itself
+
+  Returns:
+      tuple: The coordinates of a given node
+  """
+
+    cursor = db.cursor()
+    sql_sentence = f'select nodes.lat,nodes.lon from nodes where nodes.id={node_id}'
+    cursor.execute(sql_sentence)
+    result_row = cursor.fetchall()
+    return result_row[0]
+
+
 def get_route_from_ABATIS(options, lon1, lat1, lon2, lat2):
     """The function connect with ABATIS and get the route between two given coordinates
 
