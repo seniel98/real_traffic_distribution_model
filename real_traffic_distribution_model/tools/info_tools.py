@@ -464,7 +464,7 @@ def get_route_from_external_source(options, edge_a, edge_b):
     Returns:
         str: The route between the edges
     """
-    if os.path.exists('%s/valencia.net.xml' % (os.getcwd())):
+    if os.path.exists('/home/josedaniel/MapaValencia2022/valencia2022.net.xml'):
         route = ''
         with open('trips.xml', 'w+') as tripFile:
             tripFile.write("<trips>\n")
@@ -472,7 +472,7 @@ def get_route_from_external_source(options, edge_a, edge_b):
             tripFile.write("</trips>\n")
 
         # os.system('duarouter -n valencia.net.xml -r trips.xml -o rou.xml > /dev/null')
-        command_run = subprocess.call(['duarouter', '-n', 'valencia.net.xml', '-r', 'trips.xml', '-o', 'rou.xml'],
+        command_run = subprocess.call(['duarouter', '-n', '/home/josedaniel/MapaValencia2022/valencia2022.net.xml', '-r', 'trips.xml', '-o', 'rou.xml'],
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(1)
         # sts=subprocess.call('duarouter -n valencia.net.xml -r trips.xml -o rou.xml > /dev/null',shell=False)
@@ -506,18 +506,22 @@ def get_coord_from_node(db, node_id):
     sql_sentence = f'select nodes.lat,nodes.lon from nodes where nodes.id={node_id}'
     cursor.execute(sql_sentence)
     result_row = cursor.fetchall()
-    return result_row[0]
+    if result_row:
+        return result_row[0]
+    else:
+        return None
 
 
-def get_route_from_ABATIS(options, lon1, lat1, lon2, lat2):
+def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2):
     """The function connect with ABATIS and get the route between two given coordinates
 
     Args:
         options (options): Options retrieved from command line
-        lon1 (str): Longitude of point 1
+
         lat1 (str): Latitude of point 1
-        lon2 (str): Longitude of point 2
+        lon1 (str): Longitude of point 1
         lat2 (str): Latitude of point 2
+        lon2 (str): Longitude of point 2
 
     Returns:
         json: The route between two points in JSON format

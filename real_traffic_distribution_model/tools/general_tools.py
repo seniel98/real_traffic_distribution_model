@@ -166,9 +166,9 @@ def fix_edges_broken(options, db, edges, edges_broken_list):
 
         result_row = (rtdm.get_route_from_external_source(options, edge_a, edge_b))
         if result_row != 'totalFailed':
+            print(f'Aqui:{result_row}')
             edges_founded = (
-                result_row[(result_row.index(edge_a) + len(edge_a) + 1):(result_row.index(edge_b) - 1)]).split(
-                ' ')
+            result_row[(result_row.index(edge_a) + len(edge_a) + 1):(result_row.index(edge_b) - 1)]).split(' ')
             add_edges[edges_broken_list[i]] = edges_founded
         else:
             total_fail = 'totalFailed'
@@ -176,15 +176,15 @@ def fix_edges_broken(options, db, edges, edges_broken_list):
         # Fusion both dictionaries
         for i in range(0, len(edges)):
             for j in range(0, len(add_edges)):
-                if edges.keys()[i] == add_edges.keys()[j]:
-                    edges[edges.keys()[i]] = add_edges[edges.keys()[i]]
+                if list(edges.keys())[i] == list(add_edges.keys())[j]:
+                    edges[list(edges.keys())[i]] = add_edges[list(edges.keys())[i]]
         # Dictionary to vector completely
         for i in range(0, len(edges)):
             if not isinstance(edges[i], str):
-                for j in range(0, len(edges.values()[i])):
-                    new_edges.append(str(edges.values()[i][j]))
+                for j in range(0, len(list(edges.values())[i])):
+                    new_edges.append(str(list(edges.values())[i][j]))
             else:
-                new_edges.append(edges.values()[i])
+                new_edges.append(list(edges.values())[i])
     else:
         new_edges = (rtdm.get_route_from_external_source(
             options, edge_id_s, edge_id_d)).split(' ')
