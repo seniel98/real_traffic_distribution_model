@@ -166,9 +166,8 @@ def fix_edges_broken(options, db, edges, edges_broken_list):
 
         result_row = (rtdm.get_route_from_external_source(options, edge_a, edge_b))
         if result_row != 'totalFailed':
-            print(f'Aqui:{result_row}')
             edges_founded = (
-            result_row[(result_row.index(edge_a) + len(edge_a) + 1):(result_row.index(edge_b) - 1)]).split(' ')
+                result_row[(result_row.index(edge_a) + len(edge_a) + 1):(result_row.index(edge_b) - 1)]).split(' ')
             add_edges[edges_broken_list[i]] = edges_founded
         else:
             total_fail = 'totalFailed'
