@@ -148,7 +148,7 @@ def coordinates_to_edge(options, db, coor_array):
         coor_array (list): The coordinates of source and destination
 
     Returns:
-        list: The edges that are related with those coordinates
+        (list, list): The nodes and edges that are related with those coordinates
     """
     cursor = db.cursor()
     s_coor_array = []
@@ -187,33 +187,35 @@ def coordinates_to_edge(options, db, coor_array):
     for i in range(0, len(nodes_vector) - 1):
         edge = rtdm.is_edge(
             options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
-        if edge == '0':
+        if edge != '0':
             edges[i] = edge
-            edges_broken_index.append(i)
         else:
-            edges[i] = edge
+            continue
     final_edges = []
 
-    if '0' in edges.values():
-        edges_aux = []
-        for i in range(0, len(edges) - 1):
-            if edges[i] == '0' and edges[i + 1] == '0':
-                a = 0
-            else:
-                edges_aux.append(edges[i])
-            if i + 1 == len(edges) - 1:
-                edges_aux.append(edges[i + 1])
-        edges = {}
-        for i in range(0, len(edges_aux)):
-            edges[i] = edges_aux[i]
-        edges_broken_index = []
-        for i in range(0, len(edges)):
-            if edges[i] == '0':
-                edges_broken_index.append(i)
-        final_edges = rtdm.fix_edges_broken(
-            options, db, edges, edges_broken_index)
-    else:
-        for value in edges.items():
-            final_edges.append(value[1])
+    for value in edges.items():
+        final_edges.append(value[1])
+    #
+    # if '0' in edges.values():
+    #     edges_aux = []
+    #     for i in range(0, len(edges) - 1):
+    #         if edges[i] == '0' and edges[i + 1] == '0':
+    #             a = 0
+    #         else:
+    #             edges_aux.append(edges[i])
+    #         if i + 1 == len(edges) - 1:
+    #             edges_aux.append(edges[i + 1])
+    #     edges = {}
+    #     for i in range(0, len(edges_aux)):
+    #         edges[i] = edges_aux[i]
+    #     edges_broken_index = []
+    #     for i in range(0, len(edges)):
+    #         if edges[i] == '0':
+    #             edges_broken_index.append(i)
+    #     final_edges = rtdm.fix_edges_broken(
+    #         options, db, edges, edges_broken_index)
+    # else:
+    #     for value in edges.items():
+    #         final_edges.append(value[1])
     db.close()
-    return final_edges
+    return nodes_vector, final_edges

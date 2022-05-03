@@ -4,6 +4,7 @@ from optparse import OptionParser
 import database
 import tools
 import traffic_model as tm
+import cProfile
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

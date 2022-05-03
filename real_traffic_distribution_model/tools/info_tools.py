@@ -474,7 +474,13 @@ def get_route_from_external_source(options, edge_a, edge_b):
         # os.system('duarouter -n valencia.net.xml -r trips.xml -o rou.xml > /dev/null')
         command_run = subprocess.call(['duarouter', '-n', '/home/josedaniel/MapaValencia2022/valencia2022.net.xml', '-r', 'trips.xml', '-o', 'rou.xml'],
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        time.sleep(5)
+        print(edge_a)
+        print(edge_b)
+        # command_run = subprocess.call(['python3', '/home/josedaniel/sumo-1.13.0/tools/findAllRoutes.py', '-n',
+        #                                '/home/josedaniel/MapaValencia2022/valencia2022.net.xml',
+        #                                '-o', 'rou.xml', '-s', f'{edge_a}', '-t', f'{edge_b}'],
+        #                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # time.sleep(5)
         # sts=subprocess.call('duarouter -n valencia.net.xml -r trips.xml -o rou.xml > /dev/null',shell=False)
         if command_run == 0:
             for vehicle in ElementTree.parse('rou.xml').findall('vehicle'):
@@ -527,5 +533,5 @@ def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2):
         list: The route between two points in a list format
     """
 
-    url = f"http://{options.ip}:{options.port}/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?steps=true&overview=full&geometries=geojson"
+    url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?steps=true&overview=full&geometries=geojson"
     return (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
