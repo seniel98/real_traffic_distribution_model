@@ -13,23 +13,24 @@ import real_traffic_distribution_model as rtdm
 username = socket.gethostname()
 
 
-def ABATIS_update_traffic(is_remote, options):
+def ABATIS_update_traffic(is_remote, options, csv_file):
     """The function checks if the call of the server is remote or not and updates the traffic file
 
     Args:
         is_remote (bool): A boolean to say if the connections is remote or not
         options (options): Options retrieved from command line
+        csv_file (str): The path to the csv update file
     """
     if not is_remote:
         # Copy a file generate that contains a traffic update_specific_traffic_csv
         os.system("cp %s /home/josedaniel/osrm-backend/build" %
-                  rtdm.update_specific_traffic_csv)
+                  csv_file)
         # Update ABATIS Server
         os.system("'startABATIS_MLD'")
     else:
         # Copy a file generate that contains a traffic update_specific_traffic_csv
         os.system("scp %s josedaniel@%s:/home/josedaniel/osrm-backend/build" % (
-            rtdm.update_specific_traffic_csv, options.ip))
+            csv_file, options.ip))
         # It's for update in ABATIS Server
         os.system("ssh %s 'startABATIS_MLD'" % options.ip)
 
