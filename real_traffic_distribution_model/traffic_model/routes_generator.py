@@ -9,15 +9,16 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
 
-EDGE_ATA = ['A72', 'A59', 'A58', 'A413', 'A409', 'A392', 'A373', 'A30', 'A298', 'A297', 'A296', 'A287',
-            'A257', 'A1']
 update_specific_traffic_csv = 'update_specific_traffic.csv'
 
+EDGE_ATA = ['A72', 'A59', 'A58', 'A413', 'A409', 'A392', 'A373', 'A30', 'A298', 'A297', 'A296', 'A287', 'A257', 'A1']
 
-def check_distance(options, src_ata, src_lat, src_lon, des_ata, des_lat, des_lon, distance, df):
+
+def check_distance(options, src_ata, src_lat, src_lon, src_node_type, des_ata, des_lat, des_lon, des_node_type,
+                   distance, df):
     while distance < 1500.0:
-        src_ata, src_point = select_point(options, 'edge', df)
-        des_ata, des_point = select_point(options, 'city', df)
+        src_ata, src_point = select_point(options, src_node_type, df)
+        des_ata, des_point = select_point(options, des_node_type, df)
 
         src_lat, src_lon = src_point
         des_lat, des_lon = des_point
@@ -31,10 +32,23 @@ def check_distance(options, src_ata, src_lat, src_lon, des_ata, des_lat, des_lon
 
 
 def is_n_vehicles_ok(ata, df, df_copy):
-    pass
+    n_vehicles = df[df['ATA'] == ata]['n_vehicles'].to_list()
+    n_vehicles_copy = df_copy[df_copy['ATA'] == ata]['n_vehicles'].to_list()
+    if n_vehicles and n_vehicles_copy:
+        if float(n_vehicles_copy[0]) != 0.0:
+            if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.10:
+                print("Aqui")
+                return False
+            else:
+                return True
+        else:
+            return False
+    else:
+        return True
 
 
 def create_od_routes(options):
+    node_type_list = ['edge', 'city']
     traffic_df_8_15 = get_traffic_df_from_csv(options, '08:15:00')
     traffic_df_8_15_copy = traffic_df_8_15.copy()
     # traffic_df_8_30 = get_traffic_df_from_csv(options, '08:30:00')
@@ -50,12 +64,16 @@ def create_od_routes(options):
 
     route_id_list = []
     route_list = []
+    coord_route_list = []
     j = 0
 
-    while int(total_vehicles) > 534000:
-        j = j + 1
-        src_ata, src_point = select_point(options, 'edge', traffic_df_8_15)
-        des_ata, des_point = select_point(options, 'city', traffic_df_8_15)
+    while int(total_vehicles) > 0:
+        src_node = random.choices(node_type_list, cum_weights=[4, 1], k=1)
+        des_node = random.choices(node_type_list, cum_weights=[1, 4], k=1)
+        print(src_node[0], des_node[0])
+
+        src_ata, src_point = select_point(options, src_node[0], traffic_df_8_15)
+        des_ata, des_point = select_point(options, des_node[0], traffic_df_8_15)
 
         src_lat, src_lon = src_point
         des_lat, des_lon = des_point
@@ -63,8 +81,9 @@ def create_od_routes(options):
         distance = rtdm.distance_2_points(float(src_lat), float(src_lon), float(des_lat), float(des_lon))
 
         src_ata, src_lat, src_lon, des_ata, des_lat, des_lon = check_distance(options, src_ata, src_lat, src_lon,
+                                                                              src_node[0],
                                                                               des_ata,
-                                                                              des_lat, des_lon,
+                                                                              des_lat, des_lon, des_node[0],
                                                                               distance,
                                                                               traffic_df_8_15)
 
@@ -81,7 +100,7 @@ def create_od_routes(options):
         traffic_df_8_15.at[des_row_index[0], 'n_vehicles'] = np.int64(
             (traffic_df_8_15.at[des_row_index[0], 'n_vehicles'].item() - 1))
         route_ata_list = [src_ata]
-        for i in range(1, len(nodes_route) - 2):
+        for i in range(1, len(nodes_route) - 1):
             node_int = nodes_route[i][0]
             ata = get_ATA_from_node(str(node_int), traffic_df_8_15)
             if is_n_vehicles_ok(ata, traffic_df_8_15, traffic_df_8_15_copy):
@@ -93,30 +112,46 @@ def create_od_routes(options):
                     # if row_index._data.tolist():
                     traffic_df_8_15.at[row_index[0], 'n_vehicles'] = np.int64(
                         (traffic_df_8_15.at[row_index[0], 'n_vehicles'].item() - 1))
-                    # else:
-                    #     continue
-            else:
-                pass
-            #     with open(update_specific_traffic_csv, 'w') as updateTrafficFile:
-            #
-            #         line_to_write = '%s,%s,%s' % (
-            #             result_row_current[i][0], result_row_current[i][1],
-            #             (int(round(link_ABATIS.mps_to_kmph(float(result_row_current[i][2]))))))
-            #         updateTrafficFile.write(line_to_write)
-            #         updateTrafficFile.write('\n')
-            #     rtdm.ABATIS_update_traffic(False, options, )
-        route_ata_list.append(des_ata)
-        # print(route_ata_list)
-        route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
-        route_list.append(edges_route)
+                if i == (len(nodes_route) - 2):
+                    route_ata_list.append(des_ata)
+                    # print(route_ata_list)
+                    route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
+                    route_list.append(edges_route)
+                    coord_route_list.append(coord_route)
+                    total_vehicles = sum(traffic_df_8_15['n_vehicles'].to_list())
+                    total_vehicles_copy = sum(traffic_df_8_15_copy['n_vehicles'].to_list())
+                    # print(total_vehicles, total_vehicles_copy)
+                    j += 1
+                    print(f'Vehicles remaining: {total_vehicles}')
+                    print(f'Generating routes: {j}')
 
-        total_vehicles = sum(traffic_df_8_15['n_vehicles'].to_list())
-        print(total_vehicles)
-        print(f'Generating routes: {j}/55756')
+            else:
+                print("Break")
+                break
+        #     with open(update_specific_traffic_csv, 'w') as updateTrafficFile:
+        #
+        #         line_to_write = '%s,%s,%s' % (
+        #             result_row_current[i][0], result_row_current[i][1],
+        #             (int(round(link_ABATIS.mps_to_kmph(float(result_row_current[i][2]))))))
+        #         updateTrafficFile.write(line_to_write)
+        #         updateTrafficFile.write('\n')
+        #     rtdm.ABATIS_update_traffic(False, options, )
+        # route_ata_list.append(des_ata)
+        # # print(route_ata_list)
+        # route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
+        # route_list.append(edges_route)
+        #
+        # total_vehicles = sum(traffic_df_8_15['n_vehicles'].to_list())
+        # print(total_vehicles)
+        # j += 1
+        # print(f'Generating routes: {j}/55756')
+
     # print(f'Route id: {edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
     # print(f'Route: {edges_route}')
-    data = {'route_id': route_id_list, 'route': route_list}
-    pd.DataFrame.from_dict(data).to_csv("/home/josedaniel/traffic_test.csv", index=False)
+    data_routes = {'route_id': route_id_list, 'route': route_list}
+    data_coord = {'coord': coord_route_list}
+    pd.DataFrame.from_dict(data_routes).to_csv("/home/josedaniel/traffic_routes.csv", index=False)
+    pd.DataFrame.from_dict(data_coord).to_csv("/home/josedaniel/traffic_routes_coord.csv", index=False)
     traffic_df_8_15.to_csv("/home/josedaniel/traffic_8_15_modified.csv", index=False)
 
 
