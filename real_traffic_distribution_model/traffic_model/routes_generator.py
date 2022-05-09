@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 import random
 import numpy as np
+from geopy.distance import geodesic
 from xml.etree import ElementTree
 
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
@@ -16,17 +17,32 @@ EDGE_ATA = ['A72', 'A59', 'A58', 'A413', 'A409', 'A392', 'A373', 'A30', 'A298', 
 
 def check_distance(options, src_ata, src_lat, src_lon, src_node_type, des_ata, des_lat, des_lon, des_node_type,
                    distance, df):
-    while distance < 1500.0:
-        src_ata, src_point = select_point(options, src_node_type, df)
-        des_ata, des_point = select_point(options, des_node_type, df)
+    if src_node_type == "city" and des_node_type == "city":
+        while distance < 500.0:
+            src_ata, src_point = select_point(options, src_node_type, df)
+            des_ata, des_point = select_point(options, des_node_type, df)
 
-        src_lat, src_lon = src_point
-        des_lat, des_lon = des_point
+            src_lat, src_lon = src_point
+            des_lat, des_lon = des_point
 
-        distance = rtdm.distance_2_points(float(src_lat), float(src_lon), float(des_lat), float(des_lon))
-        # print(distance)
-        # print("Check distance")
-        # print(src_lat, src_lon)
+            distance = geodesic(src_point, des_point).m
+            # distance = rtdm.distance_2_points(float(src_lat), float(src_lon), float(des_lat), float(des_lon))
+            # print(distance)
+            # print("Check distance")
+            # print(src_lat, src_lon)
+    else:
+        while distance < 1500.0:
+            src_ata, src_point = select_point(options, src_node_type, df)
+            des_ata, des_point = select_point(options, des_node_type, df)
+
+            src_lat, src_lon = src_point
+            des_lat, des_lon = des_point
+
+            distance = geodesic(src_point, des_point).m
+            # distance = rtdm.distance_2_points(float(src_lat), float(src_lon), float(des_lat), float(des_lon))
+            # print(distance)
+            # print("Check distance")
+            # print(src_lat, src_lon)
 
     return src_ata, src_lat, src_lon, des_ata, des_lat, des_lon
 
@@ -36,7 +52,7 @@ def is_n_vehicles_ok(ata, df, df_copy):
     n_vehicles_copy = df_copy[df_copy['ATA'] == ata]['n_vehicles'].to_list()
     if n_vehicles and n_vehicles_copy:
         if float(n_vehicles_copy[0]) != 0.0:
-            if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.10:
+            if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.0:
                 print("Aqui")
                 return False
             else:
@@ -67,9 +83,9 @@ def create_od_routes(options):
     coord_route_list = []
     j = 0
 
-    while int(total_vehicles) > 0:
-        src_node = random.choices(node_type_list, cum_weights=[4, 1], k=1)
-        des_node = random.choices(node_type_list, cum_weights=[1, 4], k=1)
+    while int(total_vehicles) > 1000:
+        src_node = np.random.choice(node_type_list, 1, p=[0.7, 0.3])
+        des_node = np.random.choice(node_type_list, 1, p=[0.3, 0.7])
         print(src_node[0], des_node[0])
 
         src_ata, src_point = select_point(options, src_node[0], traffic_df_8_15)
@@ -78,7 +94,7 @@ def create_od_routes(options):
         src_lat, src_lon = src_point
         des_lat, des_lon = des_point
 
-        distance = rtdm.distance_2_points(float(src_lat), float(src_lon), float(des_lat), float(des_lon))
+        distance = geodesic(src_point, des_point).m
 
         src_ata, src_lat, src_lon, des_ata, des_lat, des_lon = check_distance(options, src_ata, src_lat, src_lon,
                                                                               src_node[0],
@@ -195,8 +211,10 @@ def select_point(options, node_type, df):
 def get_coord_for_ata(df, options):
     ata_list = df['ATA'].to_list()
     n_vehicles = df['n_vehicles'].to_list()
+    total_vehicles = sum(n_vehicles)
+    n_vehicles_prob = [(item / total_vehicles) for item in n_vehicles]
     # Select one ATA based on its weight probability
-    selected_ata = random.choices(ata_list, cum_weights=n_vehicles, k=1)
+    selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
     nodes = df[df['ATA'] == selected_ata[0]]['node'].to_list()
     nodes = nodes[0].split(" ")
     node = random.choice(nodes)
