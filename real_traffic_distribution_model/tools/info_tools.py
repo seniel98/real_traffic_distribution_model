@@ -533,5 +533,6 @@ def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2):
         list: The route between two points in a list format
     """
 
-    url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?steps=true&overview=full&geometries=geojson"
+    # Added the alternatives=true to the HTTP req, in order to get alternative routes. Not just the shortest path
+    url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
     return (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']

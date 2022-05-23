@@ -4,6 +4,7 @@ from optparse import OptionParser
 import database
 import tools
 import traffic_model as tm
+from datetime import datetime
 import cProfile
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -91,7 +92,10 @@ def main_actions(options):
                 database.insert_data(options)
 
             elif options.generate_routes:
+                start = datetime.now()
                 tm.create_od_routes(options)
+                end = datetime.now()
+                print(f'Execution time: {end - start}')
 
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')
