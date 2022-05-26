@@ -34,6 +34,8 @@ def get_options():
                          help="define the input additional filename")
     optParser.add_option("-t", "--traffic_file", dest="traffic_file",
                          help="CSV with the information of the traffic")
+    optParser.add_option("-g", "--routes_data", dest="routes_data",
+                         help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
                          default="traffic_data.db", help="Name of a database")
     optParser.add_option("--useTool", dest="useTool",
@@ -68,6 +70,8 @@ def get_options():
                          help="Parameter that influence on the weight of the road and its speed value")
     optParser.add_option("--generate_routes", dest="generate_routes",
                          help="Generate the o-d matrix for the traffic data")
+    optParser.add_option("--generate_vehicles", dest="generate_vehicles",
+                         help="Generate the vehicles distribution in time for the traffic data")
 
     (options, args) = optParser.parse_args()
 
@@ -94,6 +98,12 @@ def main_actions(options):
             elif options.generate_routes:
                 start = datetime.now()
                 tm.create_od_routes(options)
+                end = datetime.now()
+                print(f'Execution time: {end - start}')
+
+            elif options.generate_vehicles:
+                start = datetime.now()
+                tm.generate_vehicles_distribution(options)
                 end = datetime.now()
                 print(f'Execution time: {end - start}')
 

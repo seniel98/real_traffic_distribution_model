@@ -5,39 +5,38 @@ import random
 import numpy as np
 from geopy.distance import geodesic
 from datetime import datetime
-from xml.etree import ElementTree
 
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
 
-update_specific_traffic_csv = 'update_specific_traffic.csv'
-
 EDGE_ATA = ['A72', 'A59', 'A58', 'A413', 'A409', 'A392', 'A373', 'A30', 'A298', 'A297', 'A296', 'A287', 'A257', 'A1']
 
+is_reiterating = False
 
-def check_distance_reroute(options, mid_point, des_ata, des_lat, des_lon, des_node_type,
-                           distance_src_mid, distance_mid_des, df):
-    if distance_src_mid > 1000.0:
-        while (distance_src_mid + distance_mid_des) < 1200.0:
-            des_ata, des_point = select_point(options, des_node_type, df)
 
-            des_lat, des_lon = des_point
-
-            distance_mid_des = geodesic(mid_point, des_point).m
-
-            # print(f'Distance between points: {distance_src_mid + distance_mid_des}')
-    else:
-        while (distance_src_mid + distance_mid_des) < 2000.0:
-            des_ata, des_point = select_point(options, des_node_type, df)
-
-            des_lat, des_lon = des_point
-
-            distance_mid_des = geodesic(mid_point, des_point).m
-
-            # print(f'Distance between points: {distance_src_mid + distance_mid_des}')
-
-    return des_ata, des_lat, des_lon
+# def check_distance_reroute(options, mid_point, des_ata, des_lat, des_lon, des_node_type,
+#                            distance_src_mid, distance_mid_des, df):
+#     if distance_src_mid > 1000.0:
+#         while (distance_src_mid + distance_mid_des) < 1200.0:
+#             des_ata, des_point = select_point(options, des_node_type, df)
+#
+#             des_lat, des_lon = des_point
+#
+#             distance_mid_des = geodesic(mid_point, des_point).m
+#
+#             # print(f'Distance between points: {distance_src_mid + distance_mid_des}')
+#     else:
+#         while (distance_src_mid + distance_mid_des) < 2000.0:
+#             des_ata, des_point = select_point(options, des_node_type, df)
+#
+#             des_lat, des_lon = des_point
+#
+#             distance_mid_des = geodesic(mid_point, des_point).m
+#
+#             # print(f'Distance between points: {distance_src_mid + distance_mid_des}')
+#
+#     return des_ata, des_lat, des_lon
 
 
 def check_distance(options, src_ata, src_lat, src_lon, src_node_type, des_ata, des_lat, des_lon, des_node_type,
@@ -82,7 +81,7 @@ def is_n_vehicles_ok(ata, df, df_copy, is_src_or_des=False):
                 else:
                     return True
             else:
-                if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.2:
+                if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.5:
                     print("Number of vehicles for ATA intermediate exceeds limit")
                     return False
                 else:
@@ -94,17 +93,17 @@ def is_n_vehicles_ok(ata, df, df_copy, is_src_or_des=False):
 
 
 def create_od_routes(options):
-    global exec_time_start
-    is_reiterating = False
+    global exec_time_start, is_reiterating
+
     node_type_list = ['edge', 'city']
-    traffic_df_8_15 = get_traffic_df_from_csv(options, '08:15:00')
-    traffic_df_8_15_copy = traffic_df_8_15.copy()
+    traffic_df = get_traffic_df_from_csv(options)
+    traffic_df_copy = traffic_df.copy()
     # traffic_df_8_30 = get_traffic_df_from_csv(options, '08:30:00')
     # traffic_df_8_45 = get_traffic_df_from_csv(options, '08:45:00')
     # traffic_df_9_00 = get_traffic_df_from_csv(options, '09:00:00')
-    # traffic_df_8_15.to_csv("/home/josedaniel/traffic_8_15_default.csv", index=False)
-    total_vehicles = sum(traffic_df_8_15['n_vehicles'].to_list())
-    total_vehicles_copy = sum(traffic_df_8_15_copy['n_vehicles'].to_list())
+    # traffic_df.to_csv("/home/josedaniel/traffic_8_15_default.csv", index=False)
+    total_vehicles = sum(traffic_df['n_vehicles'].to_list())
+    total_vehicles_copy = sum(traffic_df_copy['n_vehicles'].to_list())
     # 50% vehicles from edge to city
     # 30% from city to edge
     # 25% from city to city
@@ -113,16 +112,17 @@ def create_od_routes(options):
     route_id_list = []
     route_list = []
     coord_route_list = []
+    exec_time_list = []
 
-    while int(total_vehicles) > int(total_vehicles_copy * 0.1):
+    while total_vehicles > int(total_vehicles_copy * 0.5):
         if not is_reiterating:
             exec_time_start = datetime.now()
-        route_is_possible = False
+        # route_is_possible = False
         src_node = np.random.choice(node_type_list, 1, p=[0.7, 0.3])
         des_node = np.random.choice(node_type_list, 1, p=[0.3, 0.7])
 
-        src_ata, src_point = select_point(options, src_node[0], traffic_df_8_15)
-        des_ata, des_point = select_point(options, des_node[0], traffic_df_8_15)
+        src_ata, src_point = select_point(options, src_node[0], traffic_df)
+        des_ata, des_point = select_point(options, des_node[0], traffic_df)
 
         src_lat, src_lon = src_point
         des_lat, des_lon = des_point
@@ -134,7 +134,7 @@ def create_od_routes(options):
                                                                               des_ata,
                                                                               des_lat, des_lon, des_node[0],
                                                                               distance,
-                                                                              traffic_df_8_15)
+                                                                              traffic_df)
 
         # print(src_lat, src_lon)
         coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon)
@@ -143,100 +143,83 @@ def create_od_routes(options):
                                                             coord_route)
 
         route_ata_list = []
-        if is_n_vehicles_ok(src_ata, traffic_df_8_15, traffic_df_8_15_copy, is_src_or_des=True) and is_n_vehicles_ok(
+        if is_n_vehicles_ok(src_ata, traffic_df, traffic_df_copy, is_src_or_des=True) and is_n_vehicles_ok(
                 des_ata,
-                traffic_df_8_15,
-                traffic_df_8_15_copy, is_src_or_des=True):
+                traffic_df,
+                traffic_df_copy, is_src_or_des=True):
             route_ata_list.append(src_ata)
+            for i in range(0, len(nodes_route) - 1):
+                node_int = nodes_route[i][0]
+                ata = get_ATA_from_node(str(node_int), traffic_df)
+                if is_n_vehicles_ok(ata, traffic_df, traffic_df_copy):
+                    if ata is not None and ata not in route_ata_list and ata != des_ata:
+                        route_ata_list.append(ata)
+                    if i == (len(nodes_route) - 2):
+                        route_ata_list.append(des_ata)
+                        # print(route_ata_list)
+                        for ata in route_ata_list:
+                            row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
+                            traffic_df.at[row_index[0], 'n_vehicles'] = np.int64(
+                                (traffic_df.at[row_index[0], 'n_vehicles'].item() - 1))
 
-            route_is_possible = iterate_mid_points(False, exec_time_start, is_reiterating, coord_route,
-                                                   coord_route_list, des_ata,
-                                                   edges_route,
-                                                   nodes_route, route_ata_list, route_id_list,
-                                                   route_is_possible, route_list, src_ata,
-                                                   total_vehicles_copy, traffic_df_8_15,
-                                                   traffic_df_8_15_copy)
+                        # print(f'{src_ata} --> {des_ata}')
 
-            if not route_is_possible:
-                print("Generating re-route...")
-                des_node = np.random.choice(node_type_list, 1, p=[0.3, 0.7])
-                des_ata, des_point = select_point(options, des_node[0], traffic_df_8_15)
-                lon_mid, lat_mid = coord_route[(len(route_ata_list) - 1)]
-                distance_src_mid_point = geodesic(src_point, (lat_mid, lon_mid)).m
-                distance_mid_point_des = geodesic((lat_mid, lon_mid), des_point).m
-                des_ata, des_lat, des_lon = check_distance_reroute(options, (lat_mid, lon_mid), des_ata, des_lat,
-                                                                   des_lon, des_node[0],
-                                                                   distance_src_mid_point, distance_mid_point_des,
-                                                                   traffic_df_8_15)
-                coord_mid_route = generate_route(options, lat_mid, lon_mid, des_lat, des_lon)
-                size_coord_route = len(coord_route)
-                del coord_route[len(route_ata_list) - 1:size_coord_route]
-                coord_re_route = coord_route + coord_mid_route
-                nodes_re_route, edges_re_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
-                                                                          coord_re_route)
+                        # print(route_ata_list)
+                        route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
+                        route_list.append(edges_route)
+                        coord_route_list.append(coord_route)
+                        total_vehicles = sum(traffic_df['n_vehicles'].to_list())
 
-                iterate_mid_points(True, exec_time_start, is_reiterating, coord_re_route, coord_route_list, des_ata,
-                                   edges_re_route,
-                                   nodes_re_route, route_ata_list, route_id_list,
-                                   route_is_possible, route_list, src_ata, total_vehicles_copy, traffic_df_8_15,
-                                   traffic_df_8_15_copy)
+                        # print(total_vehicles, total_vehicles_copy)
+                        # print(f'Total vehicles: {total_vehicles}')
+                        # print(f'50% of vehicles: {int(total_vehicles_copy * 0.5)}')
+                        vehicles_remaining = total_vehicles - int(total_vehicles_copy * 0.5)
+                        print(f'Vehicles remaining: {vehicles_remaining}')
+                        print(f'Total routes generated: {len(route_list)}')
+                        # route_is_possible = True
+                        exec_time_end = datetime.now()
+                        exec_time = exec_time_end.timestamp() * 1000 - exec_time_start.timestamp() * 1000
+                        exec_time_list.append(exec_time)
+                        print(f'Execution time: {exec_time}')
+
+                        is_reiterating = False
+            # if not route_is_possible:
+            #     print("Generating re-route...")
+            #     des_node = np.random.choice(node_type_list, 1, p=[0.3, 0.7])
+            #     des_ata, des_point = select_point(options, des_node[0], traffic_df)
+            #     lon_mid, lat_mid = coord_route[(len(route_ata_list) - 1)]
+            #     distance_src_mid_point = geodesic(src_point, (lat_mid, lon_mid)).m
+            #     distance_mid_point_des = geodesic((lat_mid, lon_mid), des_point).m
+            #     des_ata, des_lat, des_lon = check_distance_reroute(options, (lat_mid, lon_mid), des_ata, des_lat,
+            #                                                        des_lon, des_node[0],
+            #                                                        distance_src_mid_point, distance_mid_point_des,
+            #                                                        traffic_df)
+            #     coord_mid_route = generate_route(options, lat_mid, lon_mid, des_lat, des_lon)
+            #     size_coord_route = len(coord_route)
+            #     del coord_route[len(route_ata_list) - 1:size_coord_route]
+            #     coord_re_route = coord_route + coord_mid_route
+            #     nodes_re_route, edges_re_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
+            #                                                               coord_re_route)
+            #
+            #     iterate_mid_points(True, exec_time_start, coord_re_route, coord_route_list, des_ata,
+            #                        edges_re_route,
+            #                        nodes_re_route, route_ata_list, route_id_list,
+            #                        route_is_possible, route_list, src_ata, total_vehicles_copy, traffic_df,
+            #                        traffic_df_copy)
+                else:
+                    is_reiterating = True
+                    break
 
         else:
+            is_reiterating = True
             continue
 
     # print(f'Route id: {edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
     # print(f'Route: {edges_route}')
-    data_routes = {'route_id': route_id_list, 'route': route_list}
-    data_coord = {'coord': coord_route_list}
-    pd.DataFrame.from_dict(data_routes).to_csv("/home/josedaniel/traffic_routes_v3.1.2.csv", index=False)
-    pd.DataFrame.from_dict(data_coord).to_csv("/home/josedaniel/traffic_routes_coord_v3.1.2.csv", index=False)
-    traffic_df_8_15.to_csv("/home/josedaniel/traffic_8_15_modified_v3.1.2.csv", index=False)
-
-
-def iterate_mid_points(re_route, exec_time_start, is_reiterating, coord_route, coord_route_list, des_ata, edges_route,
-                       nodes_route,
-                       route_ata_list,
-                       route_id_list, route_is_possible, route_list, src_ata, total_vehicles_copy,
-                       traffic_df_8_15, traffic_df_8_15_copy):
-    index = 1
-    if re_route:
-        index = len(route_ata_list) - 1
-    for i in range(index, len(nodes_route) - 1):
-        node_int = nodes_route[i][0]
-        ata = get_ATA_from_node(str(node_int), traffic_df_8_15)
-        if is_n_vehicles_ok(ata, traffic_df_8_15, traffic_df_8_15_copy):
-            if ata is not None and ata not in route_ata_list and ata != des_ata:
-                route_ata_list.append(ata)
-            if i == (len(nodes_route) - 2):
-                route_ata_list.append(des_ata)
-                # print(route_ata_list)
-                for ata in route_ata_list:
-                    row_index = traffic_df_8_15.loc[traffic_df_8_15['ATA'] == ata].index
-                    traffic_df_8_15.at[row_index[0], 'n_vehicles'] = np.int64(
-                        (traffic_df_8_15.at[row_index[0], 'n_vehicles'].item() - 1))
-
-                print(f'{src_ata} --> {des_ata}')
-
-                # print(route_ata_list)
-                route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
-                route_list.append(edges_route)
-                coord_route_list.append(coord_route)
-                total_vehicles = sum(traffic_df_8_15['n_vehicles'].to_list())
-
-                # print(total_vehicles, total_vehicles_copy)
-
-                print(f'Vehicles remaining: {total_vehicles - int(total_vehicles_copy * 0.1)}')
-                print(f'Total routes generated: {len(route_list)}')
-                route_is_possible = True
-                exec_time_end = datetime.now()
-                print(f'Execution time: {exec_time_end.timestamp()*1000 - exec_time_start.timestamp()*1000}')
-                is_reiterating = False
-
-        else:
-            route_is_possible = False
-            is_reiterating = True
-            break
-    return route_is_possible
+    gen_routes_data = {'route_id': route_id_list, 'route': route_list, 'coord': coord_route_list,
+                       'exec_time': exec_time_list}
+    pd.DataFrame.from_dict(gen_routes_data).to_csv("/home/josedaniel/gen_routes_data_50p.csv", index=False)
+    traffic_df.to_csv("/home/josedaniel/traffic_df_modified_50p.csv", index=False)
 
 
 def get_ATA_from_node(node_id, df):
@@ -249,10 +232,12 @@ def get_ATA_from_node(node_id, df):
         return None
 
 
-def get_traffic_df_from_csv(options, time):
+def get_traffic_df_from_csv(options):
     # traffic_df = pd.read_csv(options.traffic_file)
     traffic_df = pd.read_csv(options.traffic_file)
-    df = traffic_df[traffic_df['time'] == time]
+    traffic_df.drop('time', inplace=True, axis=1)
+    aggregation_functions = {'ATA': 'first', 'desc': 'first', 'n_vehicles': 'sum', 'way_id': 'first', 'node': 'first'}
+    df = traffic_df.groupby(traffic_df['ATA']).aggregate(aggregation_functions)
     return df
 
 
@@ -264,10 +249,6 @@ def select_point(options, node_type, df):
             ata, point = get_coord_for_ata(ata_df, options)
         return ata, point
 
-        # Subtract one vehicle for the ata selected
-        # row_index = ata_df_copy[ata_df_copy['ATA'] == selected_ata[0]].index
-        #
-        # ata_df_copy.at[row_index[0], 'n_vehicles'] -= 1
     elif node_type == 'city':
         ata_df = df[~df['ATA'].isin(EDGE_ATA)]
         ata, point = get_coord_for_ata(ata_df, options)
