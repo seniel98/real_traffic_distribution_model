@@ -50,10 +50,7 @@ def check_distance(options, src_ata, src_lat, src_lon, src_node_type, des_ata, d
             des_lat, des_lon = des_point
 
             distance = geodesic(src_point, des_point).m
-            # distance = rtdm.distance_2_points(float(src_lat), float(src_lon), float(des_lat), float(des_lon))
-            # print(distance)
-            # print("Check distance")
-            # print(src_lat, src_lon)
+
     else:
         while distance < 2000.0:
             src_ata, src_point = select_point(options, src_node_type, df)
@@ -64,28 +61,22 @@ def check_distance(options, src_ata, src_lat, src_lon, src_node_type, des_ata, d
 
             distance = geodesic(src_point, des_point).m
 
-            # print(f'Distance between points: {distance}')
-
     return src_ata, src_lat, src_lon, des_ata, des_lat, des_lon
 
 
-def is_n_vehicles_ok(ata, df, df_copy, is_src_or_des=False):
+def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
     n_vehicles = df[df['ATA'] == ata]['n_vehicles'].to_list()
-    n_vehicles_copy = df_copy[df_copy['ATA'] == ata]['n_vehicles'].to_list()
+    n_vehicles_copy = get_n_vehicles_from_db(sqlite3.connect(options.traffic_db), ata)
     if n_vehicles and n_vehicles_copy:
-        if float(n_vehicles_copy[0]) != 0.0:
-            if is_src_or_des:
-                if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.0:
-                    print("Number of vehicles for ATA source or destination exceeds limit")
-                    return False
-                else:
-                    return True
+        if float(n_vehicles_copy) != 0.0:
+            if is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 1.0:
+                print("Number of vehicles for ATA source or destination exceeds limit")
+                return False
+            elif not is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 2.0:
+                print("Number of vehicles for ATA intermediate exceeds limit")
+                return False
             else:
-                if abs((n_vehicles_copy[0] - n_vehicles[0]) / float(n_vehicles_copy[0])) >= 1.5:
-                    print("Number of vehicles for ATA intermediate exceeds limit")
-                    return False
-                else:
-                    return True
+                return True
         else:
             return False
     else:
@@ -96,18 +87,11 @@ def create_od_routes(options):
     global exec_time_start, is_reiterating
 
     node_type_list = ['edge', 'city']
-    traffic_df = get_traffic_df_from_csv(options)
+    traffic_df = pd.read_csv(options.traffic_file)
     traffic_df_copy = traffic_df.copy()
-    # traffic_df_8_30 = get_traffic_df_from_csv(options, '08:30:00')
-    # traffic_df_8_45 = get_traffic_df_from_csv(options, '08:45:00')
-    # traffic_df_9_00 = get_traffic_df_from_csv(options, '09:00:00')
-    # traffic_df.to_csv("/home/josedaniel/traffic_8_15_default.csv", index=False)
-    total_vehicles = sum(traffic_df['n_vehicles'].to_list())
-    total_vehicles_copy = sum(traffic_df_copy['n_vehicles'].to_list())
-    # 50% vehicles from edge to city
-    # 30% from city to edge
-    # 25% from city to city
-    # 5% from edge to edge
+
+    total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
+    total_vehicles_copy = get_n_vehicles_from_db(sqlite3.connect(options.traffic_db), all_vehicles=True)
 
     route_id_list = []
     route_list = []
@@ -118,8 +102,8 @@ def create_od_routes(options):
         if not is_reiterating:
             exec_time_start = datetime.now()
         # route_is_possible = False
-        src_node = np.random.choice(node_type_list, 1, p=[0.7, 0.3])
-        des_node = np.random.choice(node_type_list, 1, p=[0.3, 0.7])
+        src_node = np.random.choice(node_type_list, 1, p=[0.6, 0.4])
+        des_node = np.random.choice(node_type_list, 1, p=[0.4, 0.6])
 
         src_ata, src_point = select_point(options, src_node[0], traffic_df)
         des_ata, des_point = select_point(options, des_node[0], traffic_df)
@@ -143,36 +127,30 @@ def create_od_routes(options):
                                                             coord_route)
 
         route_ata_list = []
-        if is_n_vehicles_ok(src_ata, traffic_df, traffic_df_copy, is_src_or_des=True) and is_n_vehicles_ok(
-                des_ata,
-                traffic_df,
-                traffic_df_copy, is_src_or_des=True):
+        if is_n_vehicles_ok(options, src_ata, traffic_df, is_src_or_des=True) and is_n_vehicles_ok(options,
+                                                                                                   des_ata,
+                                                                                                   traffic_df,
+                                                                                                   is_src_or_des=True):
             route_ata_list.append(src_ata)
             for i in range(0, len(nodes_route) - 1):
                 node_int = nodes_route[i][0]
-                ata = get_ATA_from_node(str(node_int), traffic_df)
-                if is_n_vehicles_ok(ata, traffic_df, traffic_df_copy):
+                ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), str(node_int))
+                if is_n_vehicles_ok(options, ata, traffic_df):
                     if ata is not None and ata not in route_ata_list and ata != des_ata:
                         route_ata_list.append(ata)
                     if i == (len(nodes_route) - 2):
                         route_ata_list.append(des_ata)
-                        # print(route_ata_list)
+
                         for ata in route_ata_list:
                             row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
                             traffic_df.at[row_index[0], 'n_vehicles'] = np.int64(
                                 (traffic_df.at[row_index[0], 'n_vehicles'].item() - 1))
 
-                        # print(f'{src_ata} --> {des_ata}')
-
-                        # print(route_ata_list)
                         route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
                         route_list.append(edges_route)
                         coord_route_list.append(coord_route)
-                        total_vehicles = sum(traffic_df['n_vehicles'].to_list())
+                        total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
 
-                        # print(total_vehicles, total_vehicles_copy)
-                        # print(f'Total vehicles: {total_vehicles}')
-                        # print(f'50% of vehicles: {int(total_vehicles_copy * 0.5)}')
                         vehicles_remaining = total_vehicles - int(total_vehicles_copy * 0.5)
                         print(f'Vehicles remaining: {vehicles_remaining}')
                         print(f'Total routes generated: {len(route_list)}')
@@ -183,6 +161,10 @@ def create_od_routes(options):
                         print(f'Execution time: {exec_time}')
 
                         is_reiterating = False
+                else:
+                    is_reiterating = True
+                    break
+
             # if not route_is_possible:
             #     print("Generating re-route...")
             #     des_node = np.random.choice(node_type_list, 1, p=[0.3, 0.7])
@@ -206,9 +188,6 @@ def create_od_routes(options):
             #                        nodes_re_route, route_ata_list, route_id_list,
             #                        route_is_possible, route_list, src_ata, total_vehicles_copy, traffic_df,
             #                        traffic_df_copy)
-                else:
-                    is_reiterating = True
-                    break
 
         else:
             is_reiterating = True
@@ -218,42 +197,41 @@ def create_od_routes(options):
     # print(f'Route: {edges_route}')
     gen_routes_data = {'route_id': route_id_list, 'route': route_list, 'coord': coord_route_list,
                        'exec_time': exec_time_list}
-    pd.DataFrame.from_dict(gen_routes_data).to_csv("/home/josedaniel/gen_routes_data_50p.csv", index=False)
-    traffic_df.to_csv("/home/josedaniel/traffic_df_modified_50p.csv", index=False)
+    pd.DataFrame.from_dict(gen_routes_data).to_csv("/home/josedaniel/gen_routes_data_50p_2.csv", index=False)
+    traffic_df.to_csv("/home/josedaniel/traffic_df_modified_50p_2.csv", index=False)
 
 
-def get_ATA_from_node(node_id, df):
-    df_nodes = df[df.node.str.contains(str(node_id), case=False)]
-    if not df_nodes.empty:
-        ata_list = df_nodes['ATA'].to_list()
-        ata = ata_list[0]
-        return ata
-    else:
-        return None
+# def get_ATA_from_node(options, node_id, df):
+#     df_nodes = df[df.node.str.contains(str(node_id), case=False)]
+#     if not df_nodes.empty:
+#         # ata_list = df_nodes['ATA'].to_list()
+#         # ata = ata_list[0]
+#         ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), )
+#         print(ata)
+#         return ata
+#     else:
+#         return None
 
 
-def get_traffic_df_from_csv(options):
-    # traffic_df = pd.read_csv(options.traffic_file)
-    traffic_df = pd.read_csv(options.traffic_file)
-    traffic_df.drop('time', inplace=True, axis=1)
-    aggregation_functions = {'ATA': 'first', 'desc': 'first', 'n_vehicles': 'sum', 'way_id': 'first', 'node': 'first'}
-    df = traffic_df.groupby(traffic_df['ATA']).aggregate(aggregation_functions)
-    return df
+# def get_traffic_df_from_csv(options):
+#     # traffic_df = pd.read_csv(options.traffic_file)
+#     traffic_df = pd.read_csv(options.traffic_file)
+#     traffic_df.drop('time', inplace=True, axis=1)
+#     aggregation_functions = {'ATA': 'first', 'desc': 'first', 'n_vehicles': 'sum', 'way_id': 'first', 'node': 'first'}
+#     df = traffic_df.groupby(traffic_df['ATA']).aggregate(aggregation_functions)
+#     # df.to_csv("/home/josedaniel/way_nodes_relation_merged.csv")
+#     return df
 
 
 def select_point(options, node_type, df):
     if node_type == 'edge':
         ata_df = df[df['ATA'].isin(EDGE_ATA)]
         ata, point = get_coord_for_ata(ata_df, options)
-        while point is None:
-            ata, point = get_coord_for_ata(ata_df, options)
         return ata, point
 
     elif node_type == 'city':
         ata_df = df[~df['ATA'].isin(EDGE_ATA)]
         ata, point = get_coord_for_ata(ata_df, options)
-        while point is None:
-            ata, point = get_coord_for_ata(ata_df, options)
         return ata, point
 
     # # ata_list = df['ATA'].to_list()
@@ -264,19 +242,66 @@ def select_point(options, node_type, df):
 
 
 def get_coord_for_ata(df, options):
+    global selected_ata
     ata_list = df['ATA'].to_list()
     n_vehicles = df['n_vehicles'].to_list()
-    abs_n_vehicles = [abs(item) if item < 0 else item for item in n_vehicles]
-    total_vehicles = sum(abs_n_vehicles)
-    n_vehicles_prob = [(item / total_vehicles) for item in abs_n_vehicles]
+    abs_n_vehicles = np.abs(n_vehicles)
+    total_vehicles = np.sum(abs_n_vehicles)
+    n_vehicles_prob = np.true_divide(abs_n_vehicles, total_vehicles)
     # Select one ATA based on its probability
     # print(f'Sum of probabilities: {round(sum(n_vehicles_prob), 2)}')
-    selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
-    nodes = df[df['ATA'] == selected_ata[0]]['node'].to_list()
-    nodes = nodes[0].split(" ")
-    node = random.choice(nodes)
-    return selected_ata[0], rtdm.get_coord_from_node(sqlite3.connect(options.dbPath), node)
+    point = None
+    while point is None:
+        selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
+        nodes = get_nodes_from_db(sqlite3.connect(options.traffic_db), selected_ata[0])
+        nodes = nodes[0].split(" ")
+        node = random.choice(nodes)
+        point = rtdm.get_coord_from_node(sqlite3.connect(options.dbPath), node)
+    return selected_ata[0], point
 
 
 def generate_route(options, src_lat, src_lon, dest_lat, dest_lon):
     return rtdm.get_route_from_ABATIS(options, src_lat, src_lon, dest_lat, dest_lon)
+
+
+def get_n_vehicles_from_db(db, ata="", all_vehicles=False):
+    if not all_vehicles:
+        cursor = db.cursor()
+        sql_sentence = f'select traffic.n_vehicles from traffic where traffic.ATA="{ata}"'
+        cursor.execute(sql_sentence)
+        result_row = cursor.fetchall()
+        if result_row:
+            return result_row[0][0]
+        else:
+            return None
+    else:
+        cursor = db.cursor()
+        sql_sentence = f'select traffic.n_vehicles from traffic'
+        cursor.execute(sql_sentence)
+        result_row = cursor.fetchall()
+        if result_row:
+            return np.sum(np.array(result_row))
+        else:
+            return None
+
+
+def get_ATA_from_db(db, node):
+    cursor = db.cursor()
+    sql_sentence = f'select traffic.ATA from traffic where traffic.node like "%{node}%"'
+    cursor.execute(sql_sentence)
+    result_row = cursor.fetchall()
+    if result_row:
+        return result_row[0][0]
+    else:
+        return None
+
+
+def get_nodes_from_db(db, ata):
+    cursor = db.cursor()
+    sql_sentence = f'select traffic.node from traffic where traffic.ATA="{ata}"'
+    cursor.execute(sql_sentence)
+    result_row = cursor.fetchall()
+    if result_row:
+        return result_row[0]
+    else:
+        return None
