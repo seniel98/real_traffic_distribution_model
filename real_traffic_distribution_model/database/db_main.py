@@ -50,8 +50,8 @@ def insert_data(options):
 
     rtdm.insert_edges(options, db)
 
-    #rtdm.insert_routes(options, db)
+    rtdm.insert_routes(options, db)
 
-    #rtdm.insert_vehicles(options, db)
+    rtdm.insert_vehicles(options, db)
 
     db.close()

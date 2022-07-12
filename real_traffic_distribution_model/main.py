@@ -1,11 +1,12 @@
 import os
 import sys
+import sqlite3
 from optparse import OptionParser
 import database
 import tools
 import traffic_model as tm
+import simulation_files as sim
 from datetime import datetime
-import cProfile
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -34,7 +35,7 @@ def get_options():
                          help="define the input additional filename")
     optParser.add_option("-t", "--traffic_file", dest="traffic_file",
                          help="CSV with the information of the traffic")
-    optParser.add_option("-g", "--routes_data", dest="routes_data",
+    optParser.add_option("--rd", "--routes_data", dest="routes_data",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
                          default="traffic_data.db", help="Name of a database")
@@ -52,8 +53,8 @@ def get_options():
                          action="store_true", help="Mode Start ABATIS")
     optParser.add_option("--createCongestion", dest="congestion", action="store_true",
                          help="Mode Create traffic congestion")
-    optParser.add_option("--writeAdditionalVehiclesRoutes", dest="writeAdditionalVehiclesRoutes", action="store_true",
-                         help="Mode write additional vehicles and routes into DataBase")
+    optParser.add_option("--generate_sim_files", dest="generate_sim_files", action="store_true",
+                         help="Generate the necessary files for simulating")
     optParser.add_option("--useTrafficUpdateCongestion", dest="useTrafficUpdateCongestion", action="store_true",
                          help="Mode Create traffic update congestion")
     optParser.add_option("--numExtraVehicle", dest="numextravehicles", default="0",
@@ -108,6 +109,10 @@ def main_actions(options):
                 tm.generate_vehicles_distribution(options)
                 end = datetime.now()
                 print(f'Execution time: {end - start}')
+
+            elif options.generate_sim_files and options.dbPath and options.osmfile:
+                sim.write_simulation_files(options, sqlite3.connect(options.dbPath), full_map=True,
+                                           name="v50p_1.5", sim_type="full")
 
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')

@@ -6,11 +6,11 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 import real_traffic_distribution_model as rtdm
 
 
-def segment_id_into_edges(options, db, edge_id):
-    """The function converts a given edge id into a segment id
+def segment_id_into_edges(db, edge_id):
+    """
+    The function converts a given edge id into a segment id
 
     Args:
-        options (options): Options retrieved from command line
         db (Database): The database
         edge_id (str): Edge id
 
@@ -59,11 +59,11 @@ def segment_id_into_edges(options, db, edge_id):
     return segment_id
 
 
-def edge_2_coord(options, db, edge_id):
-    """The function converts edge into coordinates
+def edge_2_coord(db, edge_id):
+    """
+    The function converts edge into coordinates
 
     Args:
-        options (options): Options retrieved from command line
         db (Database): The database
         edge_id (str): The id of the edge
 
@@ -89,11 +89,11 @@ def edge_2_coord(options, db, edge_id):
     return coor
 
 
-def edge_to_coordinates(options, db, edge_id_s, edge_id_d):
-    """ The function convert edge to coordinates
+def edge_to_coordinates(db, edge_id_s, edge_id_d):
+    """
+    The function convert edge to coordinates
 
     Args:
-        options (options): Options retrieved from command line
         db (Database): The database
         edge_id_s (str): The source edge
         edge_id_d (str): The destination edge
@@ -117,11 +117,55 @@ def edge_to_coordinates(options, db, edge_id_s, edge_id_d):
     return "%s|%s" % (lat_long_source_destination[0], lat_long_source_destination[1])
 
 
-def edge_to_nodes(options, db, edge_id):
-    """The function converts a given edge into nodes
+def edge_2_coord(db, lat, lon):
+    """
+    It takes in a database, a latitude and a longitude, and returns the edge id of the edge that contains the node with the
+    given latitude and longitude
 
     Args:
-        options (options): Options retrieved from command line
+      db: the database connection
+      lat: latitude of the point
+      lon: longitude of the point
+
+    Returns:
+      The edge id of the edge that starts at the node with the given coordinates.
+    """
+    cursor = db.cursor()
+    sql_sentence = f'select nodes.id from nodes where nodes.lat like"%{lat}%" and nodes.lon like "%{lon}%"'
+    cursor.execute(sql_sentence)
+    node = cursor.fetchall()
+    if node:
+        sql_sentence_2 = f'select edges.id from edges where edges."from"="{node[0][0]}" '
+        cursor.execute(sql_sentence_2)
+        edge = cursor.fetchall()[0][0]
+        return edge
+    else:
+        return None
+
+
+def node_2_coord(db, node_id):
+    """
+    It takes a node id as input and returns the latitude and longitude of that node
+
+    Args:
+      db: the database connection
+      node_id: the id of the node you want to find the coordinates of
+
+    Returns:
+      A list of tuples with the latitude and longitude of the node.
+    """
+    cursor = db.cursor()
+    sql_sentence = f'select nodes.lat, nodes.lon from nodes where nodes.id like "{node_id}"'
+    cursor.execute(sql_sentence)
+    coord = cursor.fetchall()
+    return coord
+
+
+def edge_to_nodes(db, edge_id):
+    """
+    The function converts a given edge into nodes
+
+    Args:
         db (Database): The database
         edge_id ([type]): [description]
 
@@ -140,7 +184,8 @@ def edge_to_nodes(options, db, edge_id):
 
 
 def coordinates_to_edge(options, db, coor_array):
-    """The function converts coordinates to edge
+    """
+    The function converts coordinates to edge
 
     Args:
         options (options): Options retrieved from command line
@@ -182,7 +227,6 @@ def coordinates_to_edge(options, db, coor_array):
         nodes_vector.insert(nodes_vector.index([key]) + 1, node)
 
     edges = {}
-    edges_broken_index = []
 
     for i in range(0, len(nodes_vector) - 1):
         edge = rtdm.is_edge(
@@ -195,27 +239,6 @@ def coordinates_to_edge(options, db, coor_array):
 
     for value in edges.items():
         final_edges.append(value[1])
-    #
-    # if '0' in edges.values():
-    #     edges_aux = []
-    #     for i in range(0, len(edges) - 1):
-    #         if edges[i] == '0' and edges[i + 1] == '0':
-    #             a = 0
-    #         else:
-    #             edges_aux.append(edges[i])
-    #         if i + 1 == len(edges) - 1:
-    #             edges_aux.append(edges[i + 1])
-    #     edges = {}
-    #     for i in range(0, len(edges_aux)):
-    #         edges[i] = edges_aux[i]
-    #     edges_broken_index = []
-    #     for i in range(0, len(edges)):
-    #         if edges[i] == '0':
-    #             edges_broken_index.append(i)
-    #     final_edges = rtdm.fix_edges_broken(
-    #         options, db, edges, edges_broken_index)
-    # else:
-    #     for value in edges.items():
-    #         final_edges.append(value[1])
+
     db.close()
     return nodes_vector, final_edges
