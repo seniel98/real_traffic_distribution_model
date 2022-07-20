@@ -5,7 +5,6 @@ import random
 import numpy as np
 from geopy.distance import geodesic
 from datetime import datetime
-import sumolib as sumo
 
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
@@ -15,7 +14,7 @@ EDGE_ATA = ['A72', 'A59', 'A58', 'A413', 'A409', 'A392', 'A373', 'A30', 'A298', 
 
 is_reiterating = False
 
-percentage = 1
+percentage = 15
 tolerated_error = 1.1
 
 
@@ -153,14 +152,18 @@ def create_od_routes(options):
                        'ATA': global_ata_list,
                        'exec_time': exec_time_list}
     gen_routes_df = pd.DataFrame.from_dict(gen_routes_data)
-    gen_routes_df.to_csv(f'/home/josedaniel/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}.csv',
-                         index=False)
+    gen_routes_df.to_csv(
+        f'/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}.csv',
+        index=False)
     gen_routes_df.drop(columns={"exec_time", "coord"}, inplace=True)
     gen_routes_df_clean = gen_routes_df['route_id'].value_counts().to_frame().reset_index()
     gen_routes_df_clean.rename(columns={'index': 'route_id', 'route_id': 'n_vehicles'}, inplace=True)
-    gen_routes_df_clean.to_csv(f'/home/josedaniel/routes_{str(percentage)}p_{str(tolerated_error)}.csv', index=False)
-    traffic_df.to_csv(f'/home/josedaniel/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}.csv',
-                      index=False)
+    gen_routes_df_clean.to_csv(
+        f'/home/josedaniel/Modelo_distrib_trafico_real/veh_per_route/routes_{str(percentage)}p_{str(tolerated_error)}.csv',
+        index=False)
+    traffic_df.to_csv(
+        f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}.csv',
+        index=False)
 
 
 def select_point(options, df=None, is_filtered=False):

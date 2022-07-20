@@ -38,9 +38,9 @@ def get_options():
     optParser.add_option("--rd", "--routes_data", dest="routes_data",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
-                         default="traffic_data.db", help="Name of a database")
+                         default="/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/db/traffic_data.db", help="Name of a database")
     optParser.add_option("--tdb", "--traffic_db", dest="traffic_db",
-                         default="way_nodes_relation_merged.db", help="Name of a database")
+                         default="/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/db/way_nodes_relation_merged.db", help="Name of a database")
     optParser.add_option("--useTool", dest="useTool",
                          action="store_true", help="Mode Use Tool(mandatory)")
     optParser.add_option("-i", "--ip", dest="ip",
