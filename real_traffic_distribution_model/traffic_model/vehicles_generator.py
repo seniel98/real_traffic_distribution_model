@@ -36,28 +36,30 @@ def generate_vehicles_distribution(options):
             if dist[i] < 1:
                 continue
             elif dist[i] == 1:
-                time = round(i / 60, 2)
-                time_str = str(time).replace(".", "")
+                # time = round(i / 60, 2)
+                # time_str = str(time).replace(".", "")
+                time_str = str(i)
                 src_edge = row["route_id"].split("_to_")[0]
                 vehicle_name = f'emitter_dd_{src_edge}_{time_str}'
-                time_list.append(time)
+                time_list.append(i)
                 vehicle_list.append(vehicle_name)
                 route_list.append(row["route_id"])
             elif dist[i] > 1:
                 for j in range(0, dist[i]):
-                    time = round(i / 60, 2)
-                    if j != 0:
-                        time += round((1 / j), 2)
-                    time_str = str(time).replace(".", "")
+                    # time = round(i / 60, 2)
+                    # if j != 0:
+                    #     time += round((1 / j), 2)
+                    # time_str = str(time).replace(".", "")
+                    time_str = str(i)
                     src_edge = row["route_id"].split("_to_")[0]
-                    vehicle_name = f'emitter_dd_{src_edge}_{time_str}'
-                    time_list.append(time)
+                    vehicle_name = f'emitter_dd_{src_edge}_{time_str}_{j}'
+                    time_list.append(i)
                     vehicle_list.append(vehicle_name)
                     route_list.append(row["route_id"])
 
     vehicle_data = {'vehicle_id': vehicle_list, 'depart': time_list, 'departLane': ["best"] * len(vehicle_list),
                     'departPos': ["last"] * len(vehicle_list),
-                    'departSpeed': ["max"] * len(vehicle_list),
+                    'departSpeed': ["avg"] * len(vehicle_list),
                     'route': route_list}
     vehicle_df = pd.DataFrame.from_dict(vehicle_data)
     vehicle_df_clean = vehicle_df.drop_duplicates(subset=['vehicle_id'])

@@ -1,4 +1,6 @@
 import sys
+import time
+
 import pandas as pd
 import sqlite3
 import random
@@ -10,11 +12,9 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
 
-EDGE_ATA = ['A72', 'A59', 'A58', 'A413', 'A409', 'A392', 'A373', 'A30', 'A298', 'A297', 'A296', 'A287', 'A257', 'A1']
-
 is_reiterating = False
 
-percentage = 15
+percentage = 25
 tolerated_error = 1.1
 
 
@@ -71,7 +71,7 @@ def create_od_routes(options):
     # Reduce traffic in the counters according to passenger_cars and vehicles_for_parking
     traffic_df.loc[:, "n_vehicles"] = traffic_df["n_vehicles"].apply(
         lambda x: int(x * passenger_cars * vehicle_not_parking))
-    # traffic_df.to_csv("/home/josedaniel/way_nodes_relation_merged_adapted.csv", index=False)
+    # traffic_df.to_csv("/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation_adapted.csv", index=False)
 
     total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
     total_vehicles_copy = get_n_vehicles_from_db(sqlite3.connect(options.traffic_db), all_vehicles=True)
@@ -98,7 +98,10 @@ def create_od_routes(options):
         src_lat, src_lon = src_point
         des_lat, des_lon = des_point
 
-        coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon)
+        coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon, process_route)
+
+        if coord_route is None:
+            continue
 
         nodes_route, edges_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
                                                             coord_route)
@@ -153,17 +156,21 @@ def create_od_routes(options):
                        'exec_time': exec_time_list}
     gen_routes_df = pd.DataFrame.from_dict(gen_routes_data)
     gen_routes_df.to_csv(
-        f'/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}.csv',
+        f'/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}_v2.csv',
         index=False)
     gen_routes_df.drop(columns={"exec_time", "coord"}, inplace=True)
     gen_routes_df_clean = gen_routes_df['route_id'].value_counts().to_frame().reset_index()
     gen_routes_df_clean.rename(columns={'index': 'route_id', 'route_id': 'n_vehicles'}, inplace=True)
     gen_routes_df_clean.to_csv(
-        f'/home/josedaniel/Modelo_distrib_trafico_real/veh_per_route/routes_{str(percentage)}p_{str(tolerated_error)}.csv',
+        f'/home/josedaniel/Modelo_distrib_trafico_real/veh_per_route/routes_{str(percentage)}p_{str(tolerated_error)}_v2.csv',
         index=False)
     traffic_df.to_csv(
-        f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}.csv',
+        f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}_v2.csv',
         index=False)
+
+
+def process_route(data):
+    return data
 
 
 def select_point(options, df=None, is_filtered=False):
@@ -219,7 +226,7 @@ def get_coord_for_ata(df, ata_list, is_filtered=False, options=None):
     return selected_ata[0], point
 
 
-def generate_route(options, src_lat, src_lon, dest_lat, dest_lon):
+def generate_route(options, src_lat, src_lon, dest_lat, dest_lon, callback):
     """
     > Given a set of options, a source latitude and longitude, and a destination latitude and longitude, return a route
 
@@ -233,7 +240,7 @@ def generate_route(options, src_lat, src_lon, dest_lat, dest_lon):
     Returns:
       A list of tuples, each tuple is a point on the route.
     """
-    return rtdm.get_route_from_ABATIS(options, src_lat, src_lon, dest_lat, dest_lon)
+    return rtdm.get_route_from_ABATIS(options, src_lat, src_lon, dest_lat, dest_lon, callback)
 
 
 def get_n_vehicles_from_db(db, ata="", all_vehicles=False):

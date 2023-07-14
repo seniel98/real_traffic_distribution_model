@@ -38,9 +38,9 @@ def get_options():
     optParser.add_option("--rd", "--routes_data", dest="routes_data",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
-                         default="/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/db/traffic_data.db", help="Name of a database")
+                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/traffic_data.db", help="Name of a database")
     optParser.add_option("--tdb", "--traffic_db", dest="traffic_db",
-                         default="/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/db/way_nodes_relation_merged.db", help="Name of a database")
+                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation.db", help="Name of a database")
     optParser.add_option("--useTool", dest="useTool",
                          action="store_true", help="Mode Use Tool(mandatory)")
     optParser.add_option("-i", "--ip", dest="ip",
@@ -111,8 +111,7 @@ def main_actions(options):
                 print(f'Execution time: {end - start}')
 
             elif options.generate_sim_files and options.dbPath and options.osmfile:
-                sim.write_simulation_files(options, sqlite3.connect(options.dbPath), full_map=True,
-                                           name="v50p_1.5", sim_type="full")
+                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="25p_1.1", sim_type="full")
 
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')

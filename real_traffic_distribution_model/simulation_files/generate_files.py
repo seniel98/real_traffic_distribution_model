@@ -28,6 +28,7 @@ def write_simulation_files(db, way_id_list=None, name="default", sim_type="Norma
       name: the name of the simulation. Defaults to default
       sim_type: The type of simulation you want to run. Defaults to Normal
     """
+    print(type(db))
     cursor = db.cursor()
 
     if way_id_list is not None:

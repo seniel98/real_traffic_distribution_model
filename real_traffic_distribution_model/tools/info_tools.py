@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from urllib.error import HTTPError
 from urllib.request import urlopen
 from xml.etree import ElementTree
 
@@ -518,7 +519,7 @@ def get_coord_from_node(db, node_id):
         return None
 
 
-def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2):
+def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2, callback):
     """The function connect with ABATIS and get the route between two given coordinates
 
     Args:
@@ -531,8 +532,21 @@ def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2):
 
     Returns:
         list: The route between two points in a list format
+        :param callback:
     """
 
-    # Added the alternatives=true to the HTTP req, in order to get alternative routes. Not just the shortest path
     url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
-    return (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
+    try:
+        data = (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
+        return callback(data)
+    except HTTPError as e:
+        content = e.read()  # Get the response content
+        try:
+            error_message = json.loads(content)
+            if error_message.get('message') == 'No route found between points':
+                print("No route found between points, skipping this pair...")
+                return None
+        except json.JSONDecodeError:
+            print(f"HTTP error occurred: {e.code} {e.reason}")
+            print(f"URL causing error: {url}")
+            return None
