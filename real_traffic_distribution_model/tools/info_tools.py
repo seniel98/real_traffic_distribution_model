@@ -1,3 +1,4 @@
+import http.client
 import json
 import math
 import os
@@ -5,9 +6,11 @@ import sqlite3
 import subprocess
 import sys
 import time
+import urllib.error
 from urllib.error import HTTPError
 from urllib.request import urlopen
 from xml.etree import ElementTree
+from http.client import RemoteDisconnected
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
@@ -536,6 +539,7 @@ def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2, callback):
     """
 
     url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
+
     try:
         data = (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
         return callback(data)
@@ -549,4 +553,18 @@ def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2, callback):
         except json.JSONDecodeError:
             print(f"HTTP error occurred: {e.code} {e.reason}")
             print(f"URL causing error: {url}")
-            return None
+    except RemoteDisconnected:
+        print("Remote server disconnected. Starting server again...")
+        rtdm.start_ABATIS(options)
+        time.sleep(5)
+    except ConnectionRefusedError:
+        print("ConnectionRefusedError. Starting server again...")
+        rtdm.start_ABATIS(options)
+        time.sleep(5)
+    except urllib.error.URLError:
+        print("URLError. Starting server again...")
+        rtdm.start_ABATIS(options)
+        time.sleep(5)
+
+    return None
+

@@ -44,7 +44,7 @@ def start_ABATIS(options):
     if (server_is_alive(options)) and (not port_is_alive(options)):
         print('Starting ABATIS...')
         # os.system("ssh -q jorzamma@%s 'sh startABATIS_MLD_MTL > /dev/null'"%(options.ip)) mtl--> no funcionaba con sh, seguramente al iniciarlo a nivel local
-        os.system("'sudo startABATIS_MLD > /dev/null'" % (options.ip))
+        subprocess.run('startABATIS_MLD', stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, shell=True)
         print('ABATIS is started...')
     elif (server_is_alive(options)) and (port_is_alive(options)):
         print('ABATIS is alive...')

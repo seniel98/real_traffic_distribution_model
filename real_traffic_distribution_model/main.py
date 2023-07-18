@@ -116,7 +116,11 @@ def main_actions(options):
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')
         else:
-            optParser.error('Server is not alive!!, please check again or use -h for help')
+            #    optParser.error('Server is not alive!!')
+            tools.start_ABATIS(options)
+
+
+
 
 
 ############################
