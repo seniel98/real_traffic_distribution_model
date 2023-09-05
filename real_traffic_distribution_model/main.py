@@ -35,7 +35,7 @@ def get_options():
                          help="define the input additional filename")
     optParser.add_option("-t", "--traffic_file", dest="traffic_file",
                          help="CSV with the information of the traffic")
-    optParser.add_option("--rd", "--routes_data", dest="routes_data",
+    optParser.add_option("--rd", "--routes_data", dest="routes_data", default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_25p_1.1_v2_full.csv",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
                          default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/traffic_data.db", help="Name of a database")
@@ -106,6 +106,7 @@ def main_actions(options):
 
             elif options.generate_vehicles:
                 start = datetime.now()
+                print(options)
                 tm.generate_vehicles_distribution(options)
                 end = datetime.now()
                 print(f'Execution time: {end - start}')

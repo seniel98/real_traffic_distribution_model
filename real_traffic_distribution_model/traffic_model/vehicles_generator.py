@@ -26,6 +26,7 @@ def generate_vehicles_distribution(options):
     vehicle_list = []
     time_list = []
     route_list = []
+    print(options.routes_data)
     routes_data_df = pd.read_csv(options.routes_data)
     df_veh_per_route = routes_data_df.pivot_table(index=['route_id'], aggfunc='size').to_frame().reset_index()
     df_veh_per_route.rename(columns={0: "n_vehicles", "index": "route_id"}, inplace=True)
@@ -63,4 +64,4 @@ def generate_vehicles_distribution(options):
                     'route': route_list}
     vehicle_df = pd.DataFrame.from_dict(vehicle_data)
     vehicle_df_clean = vehicle_df.drop_duplicates(subset=['vehicle_id'])
-    vehicle_df_clean.to_csv(f'/home/josedaniel/vehicle_data_{percentage}p_{tolerated_error}.csv', index=False)
+    vehicle_df_clean.to_csv(f'/home/josedaniel/vehicle_data_{percentage}p_{tolerated_error}_v2.csv', index=False)
