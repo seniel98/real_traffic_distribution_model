@@ -3,6 +3,7 @@ import random
 import sqlite3
 import sys
 from xml.etree import ElementTree
+import sumolib as sumo
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
@@ -17,25 +18,17 @@ def insert_nodes(options, db):
         options (options): Options retrieved from command line
         db (Database): The database
     """
-    document_net_file = ElementTree.parse(str(options.netfile))
-    document_osm_file = ElementTree.parse(str(options.osmfile))
-    nodes_used_vector = []
+    net = sumo.net.readNet(str(options.netfile))
+
     nodes_list = []
-    for edge in document_net_file.findall('edge'):
-        if edge.get("from"):
-            if edge.attrib['from'] not in nodes_used_vector:
-                nodes_used_vector.append(edge.attrib['from'])
-            if edge.attrib['to'] not in nodes_used_vector:
-                nodes_used_vector.append(edge.attrib['to'])
     j = 0
-    for node in document_osm_file.findall('node'):
-        if node.attrib['id'] in nodes_used_vector:
-            j = j + 1
-            node_inner_list = (
-                node.attrib['id'], node.attrib['lat'], node.attrib['lon'])
-            nodes_list.append(node_inner_list)
-            rtdm.update_progress(j + 1, len(nodes_used_vector),
-                                 'Inserting Nodes into DB')
+    for node in net.getNodes():
+        id_node = node.getID()
+        x, y = node.getCoords()
+        lon, lat = net.convertXY2LonLat(x, y)
+        node_inner_list = (id_node, lat, lon)
+        nodes_list.append(node_inner_list)
+        rtdm.update_progress(j + 1, len(net.getNodes()), 'Inserting Nodes into DB')
 
     db.executemany("INSERT INTO nodes(id,lat,lon) VALUES(?,?,?);", nodes_list)
     db.commit()
@@ -71,92 +64,29 @@ def insert_edges(options, db):
         options (options): Options retrieved from command line
         db (Database): The database
     """
-    document_net_file = ElementTree.parse(str(options.netfile))
-    document_osm_file = ElementTree.parse(str(options.osmfile))
+    net = sumo.net.readNet(str(options.netfile))
 
-    edge_id_vector = []
     edge_list = []
-    default_edge_list = []
     j = 0
 
-    for edge in document_net_file.findall('edge'):
-        if edge.get("from"):
-            edge_id_vector.append(edge.attrib['id'])
-            j = j + 1
-            rtdm.update_progress(
-                j + 1, len(document_net_file.findall('edge')), 'Loading Edge File')
+    for edge in net.getEdges():
 
-    edge_id_vector_natural_sorted = sorted(edge_id_vector, key=rtdm.natural_key)
-    j = 0
+        edge_id = edge.getID()
+        edge_from = edge.getFromNode()
+        edge_to = edge.getToNode()
+        edge_speed = edge.getSpeed()
+        edge_length = edge.getLength()
+        edge_type = edge.getType()
+        edge_type_clean = edge_type[edge_type.find('.') + 1:]
 
-    for i in range(0, len(edge_id_vector_natural_sorted)):
-        for edge in document_net_file.findall('edge'):
-            if edge.get("from"):
-                if edge_id_vector_natural_sorted[i] == edge.attrib['id']:
-                    if ((edge.attrib['type'])[(edge.attrib['type']).index('.') + 1:]) == 'track':
-                        if '#' in edge.attrib['id']:
-                            if '-' in edge.attrib['id'][:edge.attrib['id'].index('#')]:
-                                way_id = (edge.attrib['id'][:edge.attrib['id'].index('#')][
-                                          edge.attrib['id'][:edge.attrib['id'].index('#')].index('-') + 1:])
-                            else:
-                                way_id = edge.attrib['id'][:edge.attrib['id'].index(
-                                    '#')]
-                        else:
-                            way_id = edge.attrib['id']
-                        speed_original = 40
-                        for way in document_osm_file.findall('way'):
-                            a = way.find('tag')
-                            if way.attrib['id'] == way_id:
-                                if way.find('tag') is not None:
-                                    for t in way.findall('tag'):
-                                        if t.attrib['k'] == 'tracktype':
-                                            if (t.attrib['v']) == 'grade1':
-                                                speed_original = rtdm.kmph_to_mps(
-                                                    60)
-                                            if (t.attrib['v']) == 'grade2':
-                                                speed_original = rtdm.kmph_to_mps(
-                                                    40)
-                                            if (t.attrib['v']) == 'grade3':
-                                                speed_original = rtdm.kmph_to_mps(
-                                                    30)
-                                            if (t.attrib['v']) == 'grade4':
-                                                speed_original = rtdm.kmph_to_mps(
-                                                    25)
-                                            if (t.attrib['v']) == 'grade5':
-                                                speed_original = rtdm.kmph_to_mps(
-                                                    20)
+        edge_inner_list = (edge_id, edge_from, edge_to, edge_speed, edge_speed, edge_length, edge_type_clean)
+        edge_list.append(edge_inner_list)
 
-                        edge_inner_list = (
-                            edge.attrib['id'], edge.attrib['from'], edge.attrib['to'], speed_original, speed_original,
-                            edge.find('lane').attrib['length'],
-                            (edge.attrib['type'])[(edge.attrib['type']).index('.') + 1:])
-                        edge_list.append(edge_inner_list)
-                    else:
-                        edge_inner_list = (edge.attrib['id'], edge.attrib['from'], edge.attrib['to'],
-                                           rtdm.original_speed_from_ABATIS_default(options, db,
-                                                                                   ((edge.attrib['type'])[
-                                                                                    (
-                                                                                        edge.attrib[
-                                                                                            'type']).index(
-                                                                                        '.') + 1:])),
-                                           rtdm.original_speed_from_ABATIS_default(options, db,
-                                                                                   ((edge.attrib['type'])[
-                                                                                    (
-                                                                                        edge.attrib[
-                                                                                            'type']).index(
-                                                                                        '.') + 1:])),
-                                           edge.find('lane').attrib['length'],
-                                           (edge.attrib['type'])[(edge.attrib['type']).index('.') + 1:])
-                        default_edge_list.append(edge_inner_list)
-                    j = j + 1
-                    rtdm.update_progress(
-                        j + 1, len(edge_id_vector_natural_sorted), 'Inserting Edge into DB')
+        rtdm.update_progress(j + 1, len(net.getEdges()), 'Inserting Edge into DB')
+
     db.executemany(
         "INSERT INTO edges(id,[from],[to],speedOriginal, speedUpdated, length,edgeType) VALUES(?,?,?,?,?,?,?);",
         edge_list)
-    db.executemany(
-        "INSERT INTO edges(id,[from],[to],speedOriginal, speedUpdated, length,edgeType) VALUES(?,?,?,?,?,?,?);",
-        default_edge_list)
     db.commit()
     print('\n' + 'Edges inserted into database!')
 
