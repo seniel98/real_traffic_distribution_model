@@ -26,6 +26,8 @@ def insert_nodes(options, db):
         id_node = node.getID()
         x, y = node.getCoords()
         lon, lat = net.convertXY2LonLat(x, y)
+        lon = round(lon, 5)
+        lat = round(lat, 5)
         node_inner_list = (id_node, lat, lon)
         nodes_list.append(node_inner_list)
         rtdm.update_progress(j + 1, len(net.getNodes()), 'Inserting Nodes into DB')
