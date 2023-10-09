@@ -14,7 +14,7 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 
-percentage = 25
+percentage = 10
 tolerated_error = 1.1
 
 

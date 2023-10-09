@@ -24,7 +24,7 @@ def insert_nodes(options, db):
     j = 0
     for node in net.getNodes():
         id_node = node.getID()
-        x, y = node.getCoords()
+        x, y = node.getCoord()
         lon, lat = net.convertXY2LonLat(x, y)
         lon = round(lon, 5)
         lat = round(lat, 5)
@@ -74,23 +74,27 @@ def insert_edges(options, db):
     for edge in net.getEdges():
 
         edge_id = edge.getID()
-        edge_from = edge.getFromNode()
-        edge_to = edge.getToNode()
+        edge_from = edge.getFromNode().getID()
+        edge_to = edge.getToNode().getID()
         edge_speed = edge.getSpeed()
         edge_length = edge.getLength()
         edge_type = edge.getType()
         edge_type_clean = edge_type[edge_type.find('.') + 1:]
 
-        edge_inner_list = (edge_id, edge_from, edge_to, edge_speed, edge_speed, edge_length, edge_type_clean)
-        edge_list.append(edge_inner_list)
+        edge_list.append((edge_id, edge_from, edge_to, edge_speed, edge_speed, edge_length, edge_type_clean))
 
-        rtdm.update_progress(j + 1, len(net.getEdges()), 'Inserting Edge into DB')
+        rtdm.update_progress(j + 1, len(net.getEdges()), 'Inserting Edge into DB')# append data
 
-    db.executemany(
-        "INSERT INTO edges(id,[from],[to],speedOriginal, speedUpdated, length,edgeType) VALUES(?,?,?,?,?,?,?);",
-        edge_list)
+
+    q = """ 
+    INSERT INTO edges(id,[from],[to],speedOriginal, speedUpdated, length,edgeType) VALUES(?,?,?,?,?,?,?);          
+        """
+
+    db.executemany(q, edge_list)
     db.commit()
     print('\n' + 'Edges inserted into database!')
+
+
 
 
 def insert_routes(options, db):
