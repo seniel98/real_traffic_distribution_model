@@ -7,6 +7,7 @@ import tools
 import traffic_model as tm
 import simulation_files as sim
 from datetime import datetime
+import sumolib as sumo
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -38,7 +39,7 @@ def get_options():
     optParser.add_option("--rd", "--routes_data", dest="routes_data", default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_25p_1.1_v2_full.csv",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
-                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/traffic_data.db", help="Name of a database")
+                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/network_data.db", help="Name of a database")
     optParser.add_option("--tdb", "--traffic_db", dest="traffic_db",
                          default="/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation.db", help="Name of a database")
     optParser.add_option("--useTool", dest="useTool",
@@ -100,7 +101,8 @@ def main_actions(options):
 
             elif options.generate_routes:
                 start = datetime.now()
-                tm.create_od_routes(options)
+                net = sumo.net.readNet(str(options.netfile))
+                tm.create_od_routes(options, net)
                 end = datetime.now()
                 print(f'Execution time: {end - start}')
 

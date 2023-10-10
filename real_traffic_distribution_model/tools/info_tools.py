@@ -538,10 +538,13 @@ def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2, callback):
         :param callback:
     """
 
-    url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
+    # url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
+    url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson&annotations=nodes"
 
     try:
-        data = (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
+        # data = (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
+        data = (json.load(urlopen(url)))['routes'][0]['legs'][0]['steps']
+        # data = (json.load(urlopen(url)))['routes'][0]['legs'][0]['annotation']['nodes']
         return callback(data)
     except HTTPError as e:
         content = e.read()  # Get the response content

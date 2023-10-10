@@ -1,9 +1,23 @@
 import sys
+import re
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
+
+
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+
+def natural_keys(text):
+    '''
+    alist.sort(key=natural_keys) sorts in human order
+    http://nedbatchelder.com/blog/200712/human_sorting.html
+    (See Toothy's implementation in the comments)
+    '''
+    return [atoi(c) for c in re.split(r'(\d+)', text)]
 
 
 def segment_id_into_edges(db, edge_id):
@@ -161,6 +175,17 @@ def node_2_coord(db, node_id):
     return coord
 
 
+def coord_2_node(db, lat, lon):
+    cursor = db.cursor()
+    sql_sentence = f'select nodes.id from nodes where nodes.lat like "%{lat}%" and nodes.lon like "%{lon}%"'
+    cursor.execute(sql_sentence)
+    node = cursor.fetchall()
+    if node:
+        return node[0][0]
+    else:
+        return None
+
+
 def edge_to_nodes(db, edge_id):
     """
     The function converts a given edge into nodes
@@ -183,7 +208,7 @@ def edge_to_nodes(db, edge_id):
     return "%s" % (nodes_from_to[0])
 
 
-def coordinates_to_edge(options, db, coor_array):
+def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
     """
     The function converts coordinates to edge
 
@@ -195,50 +220,105 @@ def coordinates_to_edge(options, db, coor_array):
     Returns:
         (list, list): The nodes and edges that are related with those coordinates
     """
-    cursor = db.cursor()
-    s_coor_array = []
+    # cursor = db.cursor()
+    # s_coor_array = []
+    #
+    # for x in coor_array:
+    #     s_coor = [float(((str(x[0]))[:(str(x[0])).index('.') + 6])), float(((str(x[1]))[:(str(x[1])).index('.') + 6]))]
+    #     s_coor_array.append(s_coor)
+    # nodes_vector = []
+    # for i in range(0, len(s_coor_array)):
+    #     node = []
+    #
+    #     sql_sentence = 'select nodes.id from nodes where (nodes.lat like "%s%%" and nodes.lon like "%s%%")' % (
+    #         "{0:.5f}".format(s_coor_array[i][1]), "{0:.5f}".format(s_coor_array[i][0]))
+    #     cursor.execute(sql_sentence)
+    #     result_row_current = cursor.fetchall()
+    #     if result_row_current:
+    #         node.append(result_row_current[0][0])
+    #         nodes_vector.append(node)
+    # new_nodes = {}
+    # for i in range(0, len(nodes_vector) - 1):
+    #     edge = rtdm.is_edge(
+    #         options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
+    #     if edge == '0':
+    #         nodes = rtdm.get_to_from_edge(options, db, nodes_vector[i][0])
+    #         for j in range(0, len(nodes)):
+    #             if nodes_vector[i + 1][0] in rtdm.get_to_from_edge(options, db, nodes[j]):
+    #                 new_nodes[nodes_vector[i][0]] = nodes[j]
 
-    for x in coor_array:
-        s_coor = [float(((str(x[0]))[:(str(x[0])).index('.') + 6])), float(((str(x[1]))[:(str(x[1])).index('.') + 6]))]
-        s_coor_array.append(s_coor)
-    nodes_vector = []
-    for i in range(0, len(s_coor_array)):
-        node = []
+    # for key, value in new_nodes.items():
+    #     node = [value]
+    #     nodes_vector.insert(nodes_vector.index([key]) + 1, node)
 
-        sql_sentence = 'select nodes.id from nodes where (nodes.lat like "%s%%" and nodes.lon like "%s%%")' % (
-            "{0:.5f}".format(s_coor_array[i][1]), "{0:.5f}".format(s_coor_array[i][0]))
-        cursor.execute(sql_sentence)
-        result_row_current = cursor.fetchall()
-        if result_row_current:
-            node.append(result_row_current[0][0])
-            nodes_vector.append(node)
-    new_nodes = {}
-    for i in range(0, len(nodes_vector) - 1):
-        edge = rtdm.is_edge(
-            options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
-        if edge == '0':
-            nodes = rtdm.get_to_from_edge(options, db, nodes_vector[i][0])
-            for j in range(0, len(nodes)):
-                if nodes_vector[i + 1][0] in rtdm.get_to_from_edge(options, db, nodes[j]):
-                    new_nodes[nodes_vector[i][0]] = nodes[j]
+    # edges = {}
 
-    for key, value in new_nodes.items():
-        node = [value]
-        nodes_vector.insert(nodes_vector.index([key]) + 1, node)
+    src_lat, src_lon = point_start
+    dst_lat, dst_lon = point_end
 
-    edges = {}
+    src_node = coord_2_node(db, src_lat, src_lon)
+    dst_node = coord_2_node(db, dst_lat, dst_lon)
 
-    for i in range(0, len(nodes_vector) - 1):
-        edge = rtdm.is_edge(
-            options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
-        if edge != '0':
-            edges[i] = edge
-        else:
-            continue
+    print(src_node, dst_node)
     final_edges = []
+    for way_id in coor_array:
+        src_edge = None
+        dst_edge = None
+        is_src_edge = False
+        is_dst_edge = False
+        way_id_name = way_id['name']
+        edges_set = net.getEdgesByOrigID(way_id_name)
+        edges_id = []
+        for edge_raw in edges_set:
+            edge = edge_raw.getID()
+            edges_id.append(edge)
+            if str(src_node) in net.getEdge(edge).getFromNode().getID():
+                src_edge = edge
+                is_src_edge = True
+            if str(dst_node) in net.getEdge(edge).getToNode().getID():
+                dst_edge = edge
+                is_dst_edge = True
 
-    for value in edges.items():
-        final_edges.append(value[1])
+        sorted_edges_id = edges_id
+        sorted_edges_id.sort(key=natural_keys)
 
+        if is_src_edge:
+            # Remove all the edges that are before the source edge
+            clean_edges_sorted = sorted_edges_id[sorted_edges_id.index(src_edge):]
+            final_edges.extend(clean_edges_sorted)
+        elif is_dst_edge:
+            # Remove all the edges that are after the destination edge
+            clean_edges_sorted = sorted_edges_id[:sorted_edges_id.index(dst_edge) + 1]
+            final_edges.extend(clean_edges_sorted)
+        else:
+            final_edges.extend(sorted_edges_id)
+
+    final_nodes = []
+    for edge in final_edges:
+        src_node = net.getEdge(edge).getFromNode().getID()
+        dst_node = net.getEdge(edge).getToNode().getID()
+        final_nodes.append(src_node)
+        final_nodes.append(dst_node)
+
+    # edges = {}
+    #
+    # for i in range(0, len(coor_array) - 1):
+    #     # edge = rtdm.is_edge(
+    #     #     options, db, nodes_vector[i][0], nodes_vector[i + 1][0])
+    #     edge = rtdm.is_edge(
+    #         options, db, coor_array[i], coor_array[i + 1])
+    #     if edge != '0':
+    #         edges[i] = edge
+    #     else:
+    #         print("Error: The coordinates are not in the network")
+    #         edges[i] = None
+    #         continue
+    # final_edges = []
+    #
+    # for value in edges.items():
+    #     final_edges.append(value[1])
+
+    # print(final_edges)
+    # print(final_nodes)
     db.close()
-    return nodes_vector, final_edges
+    return final_nodes, final_edges

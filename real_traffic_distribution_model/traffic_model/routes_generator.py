@@ -51,7 +51,7 @@ def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
         return True
 
 
-def create_od_routes(options):
+def create_od_routes(options, net):
     """
     It takes a traffic file and a traffic database, and generates a
     routes file and a modified traffic file
@@ -98,13 +98,13 @@ def create_od_routes(options):
         src_lat, src_lon = src_point
         des_lat, des_lon = des_point
 
-        coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon, process_route)
-
-        if coord_route is None:
+        # coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon, process_route)
+        ways_id = rtdm.get_route_from_ABATIS(options, src_lat, src_lon, des_lat, des_lon, process_route)
+        if ways_id is None:
             continue
 
         nodes_route, edges_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
-                                                            coord_route)
+                                                            ways_id, src_point, des_point, net)
 
         route_ata_list = []
         if is_n_vehicles_ok(options, src_ata, traffic_df, is_src_or_des=True) and is_n_vehicles_ok(options,
@@ -113,7 +113,8 @@ def create_od_routes(options):
                                                                                                    is_src_or_des=True):
             route_ata_list.append(src_ata)
             for i in range(0, len(nodes_route) - 1):
-                node_int = nodes_route[i][0]
+                # node_int = nodes_route[i][0]
+                node_int = nodes_route[i]
                 ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), str(node_int))
                 if is_n_vehicles_ok(options, ata, traffic_df):
                     if ata is not None and ata not in route_ata_list and ata != des_ata:
@@ -128,7 +129,7 @@ def create_od_routes(options):
 
                         route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
                         route_list.append(edges_route)
-                        coord_route_list.append(coord_route)
+                        # coord_route_list.append(coord_route)
                         global_ata_list.append(route_ata_list)
                         total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
 
