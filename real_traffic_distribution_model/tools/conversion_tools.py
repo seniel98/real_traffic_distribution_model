@@ -218,7 +218,7 @@ def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
         coor_array (list): The coordinates of source and destination
 
     Returns:
-        (list, list): The nodes and edges that are related with those coordinates
+        (list, list, list): The coords, nodes and edges that are related with those coordinates
     """
     # cursor = db.cursor()
     # s_coor_array = []
@@ -259,39 +259,66 @@ def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
     src_node = coord_2_node(db, src_lat, src_lon)
     dst_node = coord_2_node(db, dst_lat, dst_lon)
 
-    print(src_node, dst_node)
+    src_edge = None
+    dst_edge = None
+    way_id_name_start = coor_array[0]['name']
+    way_id_name_end = coor_array[-1]['name']
+    edges_set_start = net.getEdgesByOrigID(way_id_name_start)
+    edges_set_end = net.getEdgesByOrigID(way_id_name_end)
+    edges_id = []
+    for edge_raw in edges_set_start:
+        edge = edge_raw.getID()
+        edges_id.append(edge)
+        if str(src_node) in net.getEdge(edge).getFromNode().getID():
+            src_edge = edge
+            print(src_edge)
+    for edge_raw in edges_set_end:
+        edge = edge_raw.getID()
+        edges_id.append(edge)
+        if str(dst_node) in net.getEdge(edge).getToNode().getID():
+            dst_edge = edge
+            print(dst_edge)
+
     final_edges = []
-    for way_id in coor_array:
-        src_edge = None
-        dst_edge = None
-        is_src_edge = False
-        is_dst_edge = False
-        way_id_name = way_id['name']
-        edges_set = net.getEdgesByOrigID(way_id_name)
-        edges_id = []
-        for edge_raw in edges_set:
-            edge = edge_raw.getID()
-            edges_id.append(edge)
-            if str(src_node) in net.getEdge(edge).getFromNode().getID():
-                src_edge = edge
-                is_src_edge = True
-            if str(dst_node) in net.getEdge(edge).getToNode().getID():
-                dst_edge = edge
-                is_dst_edge = True
+    if src_edge is None or dst_edge is None:
+        return None, None, None
+    path, length = net.getShortestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
+    for edge in path:
+        final_edges.append(edge.getID())
 
-        sorted_edges_id = edges_id
-        sorted_edges_id.sort(key=natural_keys)
-
-        if is_src_edge:
-            # Remove all the edges that are before the source edge
-            clean_edges_sorted = sorted_edges_id[sorted_edges_id.index(src_edge):]
-            final_edges.extend(clean_edges_sorted)
-        elif is_dst_edge:
-            # Remove all the edges that are after the destination edge
-            clean_edges_sorted = sorted_edges_id[:sorted_edges_id.index(dst_edge) + 1]
-            final_edges.extend(clean_edges_sorted)
-        else:
-            final_edges.extend(sorted_edges_id)
+    # print(src_node, dst_node)
+    # final_edges = []
+    # for way_id in coor_array:
+    #     src_edge = None
+    #     dst_edge = None
+    #     is_src_edge = False
+    #     is_dst_edge = False
+    #     way_id_name = way_id['name']
+    #     edges_set = net.getEdgesByOrigID(way_id_name)
+    #     edges_id = []
+    #     for edge_raw in edges_set:
+    #         edge = edge_raw.getID()
+    #         edges_id.append(edge)
+    #         if str(src_node) in net.getEdge(edge).getFromNode().getID():
+    #             src_edge = edge
+    #             is_src_edge = True
+    #         if str(dst_node) in net.getEdge(edge).getToNode().getID():
+    #             dst_edge = edge
+    #             is_dst_edge = True
+    #
+    #     sorted_edges_id = edges_id
+    #     sorted_edges_id.sort(key=natural_keys)
+    #
+    #     if is_src_edge:
+    #         # Remove all the edges that are before the source edge
+    #         clean_edges_sorted = sorted_edges_id[sorted_edges_id.index(src_edge):]
+    #         final_edges.extend(clean_edges_sorted)
+    #     elif is_dst_edge:
+    #         # Remove all the edges that are after the destination edge
+    #         clean_edges_sorted = sorted_edges_id[:sorted_edges_id.index(dst_edge) + 1]
+    #         final_edges.extend(clean_edges_sorted)
+    #     else:
+    #         final_edges.extend(sorted_edges_id)
 
     final_nodes = []
     for edge in final_edges:
@@ -299,6 +326,12 @@ def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
         dst_node = net.getEdge(edge).getToNode().getID()
         final_nodes.append(src_node)
         final_nodes.append(dst_node)
+
+    final_coords = []
+    for node in final_nodes:
+        x, y = net.getNode(node).getCoord()
+        lon, lat = net.convertXY2LonLat(x, y)
+        final_coords.append([lat, lon])
 
     # edges = {}
     #
@@ -321,4 +354,4 @@ def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
     # print(final_edges)
     # print(final_nodes)
     db.close()
-    return final_nodes, final_edges
+    return final_coords, final_nodes, final_edges

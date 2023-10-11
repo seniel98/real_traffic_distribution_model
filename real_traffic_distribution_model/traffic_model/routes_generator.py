@@ -14,7 +14,7 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 
-percentage = 10
+percentage = 1
 tolerated_error = 1.1
 
 
@@ -103,8 +103,10 @@ def create_od_routes(options, net):
         if ways_id is None:
             continue
 
-        nodes_route, edges_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
-                                                            ways_id, src_point, des_point, net)
+        coords_route, nodes_route, edges_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
+                                                                          ways_id, src_point, des_point, net)
+        if coords_route is None or nodes_route is None or edges_route is None:
+            continue
 
         route_ata_list = []
         if is_n_vehicles_ok(options, src_ata, traffic_df, is_src_or_des=True) and is_n_vehicles_ok(options,
@@ -129,7 +131,7 @@ def create_od_routes(options, net):
 
                         route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
                         route_list.append(edges_route)
-                        # coord_route_list.append(coord_route)
+                        coord_route_list.append(coords_route)
                         global_ata_list.append(route_ata_list)
                         total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
 
