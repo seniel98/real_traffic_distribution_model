@@ -36,7 +36,7 @@ def get_options():
                          help="define the input additional filename")
     optParser.add_option("-t", "--traffic_file", dest="traffic_file",
                          help="CSV with the information of the traffic")
-    optParser.add_option("--rd", "--routes_data", dest="routes_data", default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_25p_1.1_v2_full.csv",
+    optParser.add_option("--rd", "--routes_data", dest="routes_data", default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_1p_1.1_v2_full.csv",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
                          default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/network_data.db", help="Name of a database")
@@ -73,9 +73,9 @@ def get_options():
     optParser.add_option("--alpha", dest="alpha",
                          help="Parameter that influence on the weight of the road and its speed value")
     optParser.add_option("--generate_routes", dest="generate_routes",
-                         help="Generate the o-d matrix for the traffic data")
+                         help="Generate the o-d matrix for the traffic data", action="store_true")
     optParser.add_option("--generate_vehicles", dest="generate_vehicles",
-                         help="Generate the vehicles distribution in time for the traffic data")
+                         help="Generate the vehicles distribution in time for the traffic data", action="store_true")
 
     (options, args) = optParser.parse_args()
 
@@ -114,7 +114,7 @@ def main_actions(options):
                 print(f'Execution time: {end - start}')
 
             elif options.generate_sim_files and options.dbPath and options.osmfile:
-                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="25p_1.1", sim_type="full")
+                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="1p_1.1", sim_type="warmed_up")
 
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')

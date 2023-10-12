@@ -271,18 +271,18 @@ def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
         edges_id.append(edge)
         if str(src_node) in net.getEdge(edge).getFromNode().getID():
             src_edge = edge
-            print(src_edge)
+            # print(src_edge)
     for edge_raw in edges_set_end:
         edge = edge_raw.getID()
         edges_id.append(edge)
         if str(dst_node) in net.getEdge(edge).getToNode().getID():
             dst_edge = edge
-            print(dst_edge)
+            # print(dst_edge)
 
     final_edges = []
     if src_edge is None or dst_edge is None:
         return None, None, None
-    path, length = net.getShortestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
+    path, cost = net.getOptimalPath(net.getEdge(src_edge), net.getEdge(dst_edge))
     for edge in path:
         final_edges.append(edge.getID())
 
