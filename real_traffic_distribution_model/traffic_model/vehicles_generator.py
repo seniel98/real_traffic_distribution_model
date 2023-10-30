@@ -12,7 +12,7 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 # generate random values from Poisson distribution with mean=3 and sample size=10
 
 PERIOD = 3600
-percentage = 1
+percentage = 10
 tolerated_error = 1.1
 
 
@@ -57,10 +57,10 @@ def generate_vehicles_distribution(options):
                     vehicle_list.append(vehicle_name)
                     route_list.append(row["route_id"])
 
-    vehicle_data = {'vehicle_id': vehicle_list, 'depart': time_list, 'departLane': ["best"] * len(vehicle_list),
-                    'departPos': ["random"] * len(vehicle_list),
-                    'departSpeed': ["max"] * len(vehicle_list),
+    vehicle_data = {'vehicle_id': vehicle_list, 'depart': time_list, 'departLane': ["free"] * len(vehicle_list),
+                    'departPos': ["random_free"] * len(vehicle_list),
+                    'departSpeed': ["avg"] * len(vehicle_list),
                     'route': route_list}
     vehicle_df = pd.DataFrame.from_dict(vehicle_data)
     vehicle_df_clean = vehicle_df.drop_duplicates(subset=['vehicle_id'])
-    vehicle_df_clean.to_csv(f'/home/josedaniel/Modelo_distrib_trafico_real/vehicle_files/vehicle_data_{percentage}p_{tolerated_error}_v2.csv', index=False)
+    vehicle_df_clean.to_csv(f'/home/josedaniel/Modelo_distrib_trafico_real/vehicle_files/vehicle_data_{percentage}p_{tolerated_error}_net_edited.csv', index=False)

@@ -70,7 +70,9 @@ def write_additional_file(name, sim_type):
         additional_file.write(
             '<additional>\n')
         additional_file.write(
-            f'\t<edgeData id="edges_emissions_data" type="emissions" file="edges_emissions_data_{sim_type}.xml" excludeEmpty="true"/>\n')
+            f'\t<edgeData id="edges_emissions_data" type="emissions" file="edges_emissions_data_{name}.xml" excludeEmpty="true"/>\n')
+        additional_file.write(
+            f'\t<edgeData id="edges_traffic_measures_data" file="edges_traffic_data_{name}.xml" excludeEmpty="true"/>\n')
         additional_file.write("</additional>\n")
 
 

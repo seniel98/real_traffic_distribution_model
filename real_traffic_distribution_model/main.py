@@ -114,7 +114,7 @@ def main_actions(options):
                 print(f'Execution time: {end - start}')
 
             elif options.generate_sim_files and options.dbPath and options.osmfile:
-                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="1p_1.1", sim_type="warmed_up")
+                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="10p_1.1_net_edited", sim_type="")
 
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')

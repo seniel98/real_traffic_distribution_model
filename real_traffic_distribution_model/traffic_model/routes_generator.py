@@ -7,14 +7,13 @@ import random
 import numpy as np
 from geopy.distance import geodesic
 from datetime import datetime
-
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 
-percentage = 25
+percentage = 10
 tolerated_error = 1.1
 
 
@@ -159,16 +158,16 @@ def create_od_routes(options, net):
                        'exec_time': exec_time_list}
     gen_routes_df = pd.DataFrame.from_dict(gen_routes_data)
     gen_routes_df.to_csv(
-        f'/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}_v2.csv',
+        f'/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}_net_edited.csv',
         index=False)
     gen_routes_df.drop(columns={"exec_time", "coord"}, inplace=True)
     gen_routes_df_clean = gen_routes_df['route_id'].value_counts().to_frame().reset_index()
     gen_routes_df_clean.rename(columns={'index': 'route_id', 'route_id': 'n_vehicles'}, inplace=True)
     gen_routes_df_clean.to_csv(
-        f'/home/josedaniel/Modelo_distrib_trafico_real/veh_per_route/routes_{str(percentage)}p_{str(tolerated_error)}_v2.csv',
+        f'/home/josedaniel/Modelo_distrib_trafico_real/veh_per_route/routes_{str(percentage)}p_{str(tolerated_error)}_net_edited.csv',
         index=False)
     traffic_df.to_csv(
-        f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}_v2.csv',
+        f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}_net_edited.csv',
         index=False)
 
 
