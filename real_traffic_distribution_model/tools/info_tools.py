@@ -1,16 +1,12 @@
-import http.client
-import json
 import math
 import os
 import sqlite3
 import subprocess
 import sys
-import time
-import urllib.error
-from urllib.error import HTTPError
+import json
 from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
 from xml.etree import ElementTree
-from http.client import RemoteDisconnected
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
@@ -521,53 +517,72 @@ def get_coord_from_node(db, node_id):
     else:
         return None
 
-
 def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2, callback):
-    """The function connect with ABATIS and get the route between two given coordinates
-
-    Args:
-        options (options): Options retrieved from command line
-
-        lat1 (str): Latitude of point 1
-        lon1 (str): Longitude of point 1
-        lat2 (str): Latitude of point 2
-        lon2 (str): Longitude of point 2
-
-    Returns:
-        list: The route between two points in a list format
-        :param callback:
-    """
-
-    # url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
     url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson&annotations=nodes"
 
     try:
-        # data = (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
-        data = (json.load(urlopen(url)))['routes'][0]['legs'][0]['steps']
-        # data = (json.load(urlopen(url)))['routes'][0]['legs'][0]['annotation']['nodes']
+        response = urlopen(url)
+        data = json.load(response)['routes'][0]['legs'][0]['steps']
         return callback(data)
     except HTTPError as e:
-        content = e.read()  # Get the response content
-        try:
-            error_message = json.loads(content)
-            if error_message.get('message') == 'No route found between points':
-                print("No route found between points, skipping this pair...")
-                return None
-        except json.JSONDecodeError:
-            print(f"HTTP error occurred: {e.code} {e.reason}")
-            print(f"URL causing error: {url}")
-    except RemoteDisconnected:
-        print("Remote server disconnected. Starting server again...")
+        if e.code == 404:  # No route found
+            print("No route found between points, skipping this pair...")
+        else:
+            print(f"HTTP error occurred: {e.code} {e.reason}, URL: {url}")
+    except (URLError, ConnectionResetError) as e:
+        print(f"Connection error: {e.reason}, attempting to restart ABATIS.")
         rtdm.start_ABATIS(options)
-        time.sleep(5)
-    except ConnectionRefusedError:
-        print("ConnectionRefusedError. Starting server again...")
-        rtdm.start_ABATIS(options)
-        time.sleep(5)
-    except urllib.error.URLError:
-        print("URLError. Starting server again...")
-        rtdm.start_ABATIS(options)
-        time.sleep(5)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
     return None
+
+# def get_route_from_ABATIS(options, lat1, lon1, lat2, lon2, callback):
+#     """The function connect with ABATIS and get the route between two given coordinates
+#
+#     Args:
+#         options (options): Options retrieved from command line
+#
+#         lat1 (str): Latitude of point 1
+#         lon1 (str): Longitude of point 1
+#         lat2 (str): Latitude of point 2
+#         lon2 (str): Longitude of point 2
+#
+#     Returns:
+#         list: The route between two points in a list format
+#         :param callback:
+#     """
+#
+#     # url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson"
+#     url = f"http://0.0.0.0:5000/route/v1/driving/{lon1},{lat1};{lon2},{lat2}.json?alternatives=true&steps=true&overview=full&geometries=geojson&annotations=nodes"
+#
+#     try:
+#         # data = (json.load(urlopen(url)))['routes'][0]['geometry']['coordinates']
+#         data = (json.load(urlopen(url)))['routes'][0]['legs'][0]['steps']
+#         # data = (json.load(urlopen(url)))['routes'][0]['legs'][0]['annotation']['nodes']
+#         return callback(data)
+#     except HTTPError as e:
+#         content = e.read()  # Get the response content
+#         try:
+#             error_message = json.loads(content)
+#             if error_message.get('message') == 'No route found between points':
+#                 print("No route found between points, skipping this pair...")
+#                 return None
+#         except json.JSONDecodeError:
+#             print(f"HTTP error occurred: {e.code} {e.reason}")
+#             print(f"URL causing error: {url}")
+#     except RemoteDisconnected:
+#         print("Remote server disconnected. Starting server again...")
+#         rtdm.start_ABATIS(options)
+#         time.sleep(5)
+#     except ConnectionRefusedError:
+#         print("ConnectionRefusedError. Starting server again...")
+#         rtdm.start_ABATIS(options)
+#         time.sleep(5)
+#     except urllib.error.URLError:
+#         print("URLError. Starting server again...")
+#         rtdm.start_ABATIS(options)
+#         time.sleep(5)
+#
+#     return None
 

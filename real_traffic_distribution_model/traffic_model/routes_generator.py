@@ -13,7 +13,7 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 
-percentage = 10
+percentage = 25
 tolerated_error = 1.1
 
 
@@ -36,11 +36,11 @@ def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
     if n_vehicles and n_vehicles_copy:
         if float(n_vehicles_copy) != 0.0:
             if is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 1.0:
-                print("Number of vehicles for ATA source or destination exceeds limit")
+                # print("Number of vehicles for ATA source or destination exceeds limit")
                 return False
             elif not is_src_or_des and abs(
                     (n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= tolerated_error:
-                print("Number of vehicles for ATA intermediate exceeds limit")
+                # print("Number of vehicles for ATA intermediate exceeds limit")
                 return False
             else:
                 return True
@@ -62,26 +62,28 @@ def create_od_routes(options, net):
 
     traffic_df = pd.read_csv(options.traffic_file)
 
-    # According to DGT stats 72% of vehicles are passenger cars in Valencia
     passenger_cars = 0.72
-    # According to papers for cities like Zurich and Stuttgart, 15% vehicles are cruising for parking
-    vehicle_not_parking = 1 - 0.15
+    vehicle_not_parking = 0.85
 
-    # Reduce traffic in the counters according to passenger_cars and vehicles_for_parking
-    traffic_df.loc[:, "n_vehicles"] = traffic_df["n_vehicles"].apply(
-        lambda x: int(x * passenger_cars * vehicle_not_parking))
-    # traffic_df.to_csv("/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation_adapted.csv", index=False)
+    # Apply vectorized operations for efficiency
+    traffic_df['n_vehicles'] = (traffic_df['n_vehicles'] * passenger_cars * vehicle_not_parking).astype(int)
 
-    total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
-    total_vehicles_copy = get_n_vehicles_from_db(sqlite3.connect(options.traffic_db), all_vehicles=True)
+    # Connect to the database once, outside the loop
+    with sqlite3.connect(options.traffic_db) as conn:
+        total_vehicles_copy = get_n_vehicles_from_db(conn, all_vehicles=True)
+
+    total_vehicles = traffic_df['n_vehicles'].sum()
 
     route_id_list = []
     route_list = []
     coord_route_list = []
     exec_time_list = []
     global_ata_list = []
+    print_number = 0
+    total_exec_time = 0
     # The above code is generating routes for the given percentage of vehicles.
     while total_vehicles > int((total_vehicles_copy * (1 - (percentage / 100)))):
+
         if not is_reiterating:
             exec_time_start = datetime.now()
 
@@ -100,11 +102,13 @@ def create_od_routes(options, net):
         # coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon, process_route)
         ways_id = rtdm.get_route_from_ABATIS(options, src_lat, src_lon, des_lat, des_lon, process_route)
         if ways_id is None:
+            is_reiterating = True
             continue
 
         coords_route, nodes_route, edges_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
                                                                           ways_id, src_point, des_point, net)
         if coords_route is None or nodes_route is None or edges_route is None:
+            is_reiterating = True
             continue
 
         route_ata_list = []
@@ -136,13 +140,18 @@ def create_od_routes(options, net):
 
                         vehicles_remaining = int(total_vehicles) - int(
                             (total_vehicles_copy * (1 - (percentage / 100))))
-                        print(f'Vehicles remaining: {vehicles_remaining}')
-                        print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
-                        # route_is_possible = True
+
                         exec_time_end = datetime.now()
                         exec_time = exec_time_end.timestamp() * 1000 - exec_time_start.timestamp() * 1000
+                        total_exec_time += exec_time
                         exec_time_list.append(exec_time)
-                        print(f'Execution time: {exec_time}')
+
+                        if print_number % 10 == 0:
+                            print(f'Vehicles remaining: {vehicles_remaining}')
+                            print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
+                            # route_is_possible = True
+                            print(f'Total execution time: {(total_exec_time/1000):.2f} seconds')
+                        print_number += 1
 
                         is_reiterating = False
                 else:

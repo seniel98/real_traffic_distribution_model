@@ -114,7 +114,10 @@ def main_actions(options):
                 print(f'Execution time: {end - start}')
 
             elif options.generate_sim_files and options.dbPath and options.osmfile:
-                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="10p_1.1_net_edited", sim_type="")
+                vehicles_distribution_dict = {"electric": 0.7, "hybrid": 3.93,"gasoline_b": 31.25, "gasoline_c": 21.08,
+                                              "gas_oil_b": 34.23, "gas_oil_c": 23.09}
+                sim.write_simulation_files(sqlite3.connect(options.dbPath), name="scenario1_", sim_type="no_rr",
+                                           vehicle_type_dict=vehicles_distribution_dict)
 
             else:
                 optParser.error('Command incomplete, please check again or use -h for help')
