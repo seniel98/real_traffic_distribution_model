@@ -8,7 +8,6 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
 
-
 def atoi(text):
     return int(text) if text.isdigit() else text
 
@@ -210,30 +209,37 @@ def edge_to_nodes(db, edge_id):
     return "%s" % (nodes_from_to[0])
 
 
-def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
+def coordinates_to_edge(coor_array, net, primary_count, roundabouts):
     way_id_name_start = coor_array[0]['name']
     way_id_name_end = coor_array[-1]['name']
     edges_set_start = list(net.getEdgesByOrigID(way_id_name_start))
     edges_set_end = list(net.getEdgesByOrigID(way_id_name_end))
 
     if not edges_set_start or not edges_set_end:
-        return None, None, None
+        return None, None, None, primary_count
 
     src_edge = edges_set_start[randint(0, len(edges_set_start) - 1)].getID() if len(edges_set_start) > 1 else edges_set_start[0].getID()
     dst_edge = edges_set_end[randint(0, len(edges_set_end) - 1)].getID() if len(edges_set_end) > 1 else edges_set_end[0].getID()
 
-    if net.getEdge(src_edge).getLength() < 50 or net.getEdge(dst_edge).getLength() < 50:
-        return None, None, None
+    # Reject the selection if the count of primary links reaches 3 or if any edge is shorter than 75 units.
+    if net.getEdge(src_edge).getLength() < 50 or net.getEdge(dst_edge).getLength() < 50 or net.getEdge(src_edge).getType() == "highway.primary_link" or src_edge in roundabouts or dst_edge in roundabouts:
+        return None, None, None, primary_count
+    #if net.getEdge(src_edge).getLength() < 25 or net.getEdge(dst_edge).getLength() < 25 or net.getEdge(src_edge).getType() == "highway.primary":
+    #    return None, None, None
 
-    path, _ = net.getFastestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
+    path, _ = net.getOptimalPath(net.getEdge(src_edge), net.getEdge(dst_edge))
     if path is None:
-        return None, None, None
+        return None, None, None, primary_count
+
+    # Check if the selected source edge is a primary link.
+    if net.getEdge(src_edge).getType() == "highway.primary":
+        primary_count += 1  # Increment the count if it's a primary link.
 
     final_edges = [edge.getID() for edge in path]
     final_nodes = [node.getID() for edge in path for node in (edge.getFromNode(), edge.getToNode())]
     final_coords = [net.convertXY2LonLat(*net.getNode(node).getCoord()) for node in final_nodes]
 
-    return final_coords, final_nodes, final_edges
+    return final_coords, final_nodes, final_edges, primary_count
 
 # def coordinates_to_edge(options, db, coor_array, point_start, point_end, net):
 #     """

@@ -13,10 +13,11 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 
-percentage = 25
+percentage = 30
 tolerated_error = 1.1
 
-
+primary_count = 0
+roundabouts = set()
 def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
     """
     It checks if the number of vehicles for a given ATA is within the tolerated error
@@ -58,7 +59,7 @@ def create_od_routes(options, net):
     Args:
       options: the options object that contains the path to the database and the path to the traffic file
     """
-    global exec_time_start, is_reiterating
+    global exec_time_start, is_reiterating, primary_count
 
     traffic_df = pd.read_csv(options.traffic_file)
 
@@ -67,6 +68,10 @@ def create_od_routes(options, net):
 
     # Apply vectorized operations for efficiency
     traffic_df['n_vehicles'] = (traffic_df['n_vehicles'] * passenger_cars * vehicle_not_parking).astype(int)
+
+    # Get the edges for the roundabouts
+    for roundabout in net.getRoundabouts():
+        roundabouts.update(roundabout.getEdges())
 
     # Connect to the database once, outside the loop
     with sqlite3.connect(options.traffic_db) as conn:
@@ -105,10 +110,13 @@ def create_od_routes(options, net):
             is_reiterating = True
             continue
 
-        coords_route, nodes_route, edges_route = rtdm.coordinates_to_edge(options, sqlite3.connect(options.dbPath),
-                                                                          ways_id, src_point, des_point, net)
+        coords_route, nodes_route, edges_route, primary_count = rtdm.coordinates_to_edge(ways_id, net, primary_count, roundabouts)
         if coords_route is None or nodes_route is None or edges_route is None:
             is_reiterating = True
+            continue
+        if primary_count >= 2:
+            is_reiterating = True
+            primary_count = 0
             continue
 
         route_ata_list = []
