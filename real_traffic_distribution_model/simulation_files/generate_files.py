@@ -73,6 +73,7 @@ def write_simulation_files(db, way_id_list=None, name="default", sim_type="Norma
         for vehicle_type, _ in vehicle_type_dict.items():
             vehicles_for_type = distributed_vehicles[vehicle_type]
             write_rou_file(cursor, name, sim_type, vehicle_type, vehicles_for_type)
+            write_additional_file(name, sim_type, vehicle_type)
         write_additional_file(name, sim_type)
 
 
@@ -94,13 +95,14 @@ def distribute_vehicles_round_robin(all_vehicles, vehicle_type_dict):
 
 
 
-def write_additional_file(name, sim_type):
+def write_additional_file(name, sim_type, vehicle_type=""):
     """
     It writes an additional file for the simulation
 
     Args:
       name: The name of the simulation.
       sim_type: The type of simulation you want to run. This can be either "", "a", or "b".
+      vehicle_type: The type of vehicle you want to simulate.
       """
     with open("%s/Algoritmo_rutas_eco/ArchivosSimulacion/Escenarios/valencia.%s%s.add.xml" % (os.getcwd(), name.replace(" ", ""), sim_type), 'w+') as additional_file:
         additional_file.write(
@@ -108,9 +110,9 @@ def write_additional_file(name, sim_type):
         additional_file.write(
             '<additional>\n')
         additional_file.write(
-            f'\t<edgeData id="edges_emissions_data_agg" type="emissions" file="edges_emissions_data_agg_{name}_{sim_type}.xml" excludeEmpty="true"/>\n')
+            f'\t<edgeData id="edges_emissions_data_agg" type="emissions" file="edges_emissions_data_agg_{name}_{sim_type}.xml" excludeEmpty="true" vType={vehicle_type}/>\n')
         additional_file.write(
-                f'\t<edgeData id="edges_traffic_measures_data_agg" file="edges_traffic_data_agg_{name}_{sim_type}.xml" excludeEmpty="true"/>\n')
+                f'\t<edgeData id="edges_traffic_measures_data_agg" file="edges_traffic_data_agg_{name}_{sim_type}.xml" excludeEmpty="true" vType="{vehicle_type}"/>\n')
         additional_file.write("</additional>\n")
 
 

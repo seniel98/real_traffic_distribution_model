@@ -221,13 +221,15 @@ def coordinates_to_edge(coor_array, net, primary_count, roundabouts):
     src_edge = edges_set_start[randint(0, len(edges_set_start) - 1)].getID() if len(edges_set_start) > 1 else edges_set_start[0].getID()
     dst_edge = edges_set_end[randint(0, len(edges_set_end) - 1)].getID() if len(edges_set_end) > 1 else edges_set_end[0].getID()
 
+    if src_edge in roundabouts or dst_edge in roundabouts:
+        return None, None, None, primary_count
     # Reject the selection if the count of primary links reaches 3 or if any edge is shorter than 75 units.
-    if net.getEdge(src_edge).getLength() < 50 or net.getEdge(dst_edge).getLength() < 50 or net.getEdge(src_edge).getType() == "highway.primary_link" or src_edge in roundabouts or dst_edge in roundabouts:
+    if net.getEdge(src_edge).getLength() < 75 or net.getEdge(dst_edge).getLength() < 60 or net.getEdge(src_edge).getType() == "highway.primary_link":
         return None, None, None, primary_count
     #if net.getEdge(src_edge).getLength() < 25 or net.getEdge(dst_edge).getLength() < 25 or net.getEdge(src_edge).getType() == "highway.primary":
     #    return None, None, None
 
-    path, _ = net.getOptimalPath(net.getEdge(src_edge), net.getEdge(dst_edge))
+    path, _ = net.getFastestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
     if path is None:
         return None, None, None, primary_count
 

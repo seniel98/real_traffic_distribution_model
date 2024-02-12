@@ -13,7 +13,7 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 
-percentage = 30
+percentage = 25
 tolerated_error = 1.1
 
 primary_count = 0
@@ -114,7 +114,7 @@ def create_od_routes(options, net):
         if coords_route is None or nodes_route is None or edges_route is None:
             is_reiterating = True
             continue
-        if primary_count >= 2:
+        if primary_count >= 3:
             is_reiterating = True
             primary_count = 0
             continue
@@ -211,7 +211,56 @@ def select_point(options, df=None, is_filtered=False):
     return ata, point
 
 
-def get_coord_for_ata(df, ata_list, is_filtered=False, options=None):
+def softmax(x):
+    """Compute softmax values for each set of scores in x."""
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0)
+
+
+def get_coord_for_ata(df, ata_list, is_filtered=False, options=None, prev_selected_ata=None):
+    """
+    The function takes in a dataframe, a list of ATA codes, a boolean value indicating whether the dataframe is filtered
+    or not, a dictionary of options, and the previously selected ATA code. It returns the selected ATA code and the point
+    (latitude and longitude) of the selected ATA, with a more distributed selection process.
+
+    Args:
+      df: The dataframe containing the data
+      ata_list: list of ATA codes
+      is_filtered: If True, the function will use the ATA list from the dataframe. If False, it will use the list passed as
+                   an argument. Defaults to False
+      options: The options object that contains the path to the database.
+      prev_selected_ata: The ATA code selected in the previous call to this function, to prevent consecutive selections.
+
+    Returns:
+      the selected ATA and the point (lat, lon)
+    """
+    if is_filtered:
+        ata_list = df['ATA'].to_list()
+    n_vehicles = df['n_vehicles'].to_list()
+    abs_n_vehicles = np.abs(n_vehicles)
+    total_vehicles = np.sum(abs_n_vehicles)
+    n_vehicles_prob = np.true_divide(abs_n_vehicles, total_vehicles)
+    n_vehicles_prob = softmax(n_vehicles_prob)  # Apply softmax to smooth probabilities
+
+    # Reduce the probability of previously selected ATA to distribute the selection
+    if prev_selected_ata is not None and prev_selected_ata in ata_list:
+        index = ata_list.index(prev_selected_ata)
+        n_vehicles_prob[index] *= 0.5  # Halve the probability of the previously selected ATA
+
+    point = None
+    selected_ata = None
+    while point is None:
+        selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
+        nodes = get_nodes_from_db(sqlite3.connect(options.traffic_db), selected_ata[0])
+        nodes = nodes[0].split(" ")
+        if nodes:  # Ensure nodes list is not empty
+            node = random.choice(nodes)
+            point = rtdm.get_coord_from_node(sqlite3.connect(options.dbPath), node)
+
+    return selected_ata[0], point
+
+
+def get_coord_for_ata_v_old(df, ata_list, is_filtered=False, options=None):
     """
     The function takes in a dataframe, a list of ATA codes, and a boolean value indicating whether the dataframe is filtered
     or not. It also takes in a dictionary of options. The function returns the selected ATA code and the point (latitude and
