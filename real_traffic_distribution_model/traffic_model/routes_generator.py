@@ -7,6 +7,9 @@ import random
 import numpy as np
 from geopy.distance import geodesic
 from datetime import datetime
+
+from numpy.random import randint
+
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
@@ -18,6 +21,8 @@ tolerated_error = 1.1
 
 primary_count = 0
 roundabouts = set()
+
+
 def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
     """
     It checks if the number of vehicles for a given ATA is within the tolerated error
@@ -101,22 +106,25 @@ def create_od_routes(options, net):
 
         des_ata, des_point = select_point(options, df=traffic_df_filtered, is_filtered=True)
 
-        src_lat, src_lon = src_point
-        des_lat, des_lon = des_point
+        # src_lat, src_lon = src_point
+        # des_lat, des_lon = des_point
 
         # coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon, process_route)
-        ways_id = rtdm.get_route_from_ABATIS(options, src_lat, src_lon, des_lat, des_lon, process_route)
-        if ways_id is None:
-            is_reiterating = True
-            continue
+        # ways_id = rtdm.get_route_from_ABATIS(options, src_lat, src_lon, des_lat, des_lon, process_route)
+        # if ways_id is None:
+        #     is_reiterating = True
+        #     continue
 
-        coords_route, nodes_route, edges_route, primary_count = rtdm.coordinates_to_edge(ways_id, net, primary_count, roundabouts)
+        # coords_route, nodes_route, edges_route, primary_count = rtdm.coordinates_to_edge(ways_id, net, primary_count, roundabouts)
+        # print(f"Source point: {src_point}")
+        # print(f"Destination point: {des_point}")
+        # coords_route, nodes_route, edges_route, primary_count = rtdm.coordinates_to_edge([src_point, des_point], net, primary_count,
+        #                                                                                  roundabouts)
+
+        coords_route, nodes_route, edges_route = calculate_route(sqlite3.connect(options.dbPath), src_point, des_point,
+                                                                 net, roundabouts)
         if coords_route is None or nodes_route is None or edges_route is None:
             is_reiterating = True
-            continue
-        if primary_count >= 3:
-            is_reiterating = True
-            primary_count = 0
             continue
 
         route_ata_list = []
@@ -158,7 +166,7 @@ def create_od_routes(options, net):
                             print(f'Vehicles remaining: {vehicles_remaining}')
                             print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
                             # route_is_possible = True
-                            print(f'Total execution time: {(total_exec_time/1000):.2f} seconds')
+                            print(f'Total execution time: {(total_exec_time / 1000):.2f} seconds')
                         print_number += 1
 
                         is_reiterating = False
@@ -186,6 +194,39 @@ def create_od_routes(options, net):
     traffic_df.to_csv(
         f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}_net_edited.csv',
         index=False)
+
+
+def calculate_route(db, src_point, des_point, net, roundabouts):
+    src_lat, src_lon = src_point
+    des_lat, des_lon = des_point
+    edges_set_start = rtdm.coord_to_edges(db, src_lat, src_lon)
+    edges_set_end = rtdm.coord_to_edges(db, des_lat, des_lon)
+
+    # print(f"Source edge: {edges_set_start}")
+    # print(f"Destination edge: {edges_set_end}")
+
+    if edges_set_start is not None or edges_set_end is not None:
+
+        src_edge = str(edges_set_start[randint(0, len(edges_set_start) - 1)][0] if len(edges_set_start) > 1 else
+                       edges_set_start[0][0])
+        dst_edge = str(
+            edges_set_end[randint(0, len(edges_set_end) - 1)][0] if len(edges_set_end) > 1 else edges_set_end[0][0])
+
+        if (src_edge not in roundabouts or dst_edge not in roundabouts) and (
+                net.getEdge(src_edge).getLength() > 75 or net.getEdge(dst_edge).getLength() > 75 or net.getEdge(
+                src_edge).getType() != "highway.primary_link"):
+
+            path, _ = net.getFastestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
+            if path is not None:
+                final_edges = [edge.getID() for edge in path]
+                final_nodes = [node.getID() for edge in path for node in (edge.getFromNode(), edge.getToNode())]
+                final_coords = [net.convertXY2LonLat(*net.getNode(node).getCoord()) for node in final_nodes]
+
+                return final_coords, final_nodes, final_edges
+    else:
+        return None, None, None
+
+    return None, None, None
 
 
 def process_route(data):

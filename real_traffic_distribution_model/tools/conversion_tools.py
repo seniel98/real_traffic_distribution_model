@@ -8,6 +8,7 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
 import real_traffic_distribution_model as rtdm
 
+
 def atoi(text):
     return int(text) if text.isdigit() else text
 
@@ -209,7 +210,35 @@ def edge_to_nodes(db, edge_id):
     return "%s" % (nodes_from_to[0])
 
 
+def coord_to_edges(db, lat, lon):
+    """
+    The function converts a given coordinate into edges
+
+    Args:
+        db (Database): The database
+        lat (float): Latitude
+        lon (float): Longitude
+
+    Returns:
+        [type]: [description]
+    """
+    cursor = db.cursor()
+    sql_sentence = 'select nodes.id from nodes where nodes.lat like "%s%%" and nodes.lon like "%s%%"' % (
+        lat, lon)
+    cursor.execute(sql_sentence)
+    node = cursor.fetchall()
+    if node:
+        sql_sentence_2 = 'select edges.id from edges where edges."from"="%s" or edges."to"="%s"' % (
+            node[0][0], node[0][0])
+        cursor.execute(sql_sentence_2)
+        edge = cursor.fetchall()
+        return edge
+    else:
+        return None
+
+
 def coordinates_to_edge(coor_array, net, primary_count, roundabouts):
+    # Use if ABATIS is used
     way_id_name_start = coor_array[0]['name']
     way_id_name_end = coor_array[-1]['name']
     edges_set_start = list(net.getEdgesByOrigID(way_id_name_start))
@@ -218,24 +247,27 @@ def coordinates_to_edge(coor_array, net, primary_count, roundabouts):
     if not edges_set_start or not edges_set_end:
         return None, None, None, primary_count
 
-    src_edge = edges_set_start[randint(0, len(edges_set_start) - 1)].getID() if len(edges_set_start) > 1 else edges_set_start[0].getID()
-    dst_edge = edges_set_end[randint(0, len(edges_set_end) - 1)].getID() if len(edges_set_end) > 1 else edges_set_end[0].getID()
+    src_edge = edges_set_start[randint(0, len(edges_set_start) - 1)].getID() if len(edges_set_start) > 1 else \
+    edges_set_start[0].getID()
+    dst_edge = edges_set_end[randint(0, len(edges_set_end) - 1)].getID() if len(edges_set_end) > 1 else edges_set_end[
+        0].getID()
 
     if src_edge in roundabouts or dst_edge in roundabouts:
         return None, None, None, primary_count
     # Reject the selection if the count of primary links reaches 3 or if any edge is shorter than 75 units.
-    if net.getEdge(src_edge).getLength() < 75 or net.getEdge(dst_edge).getLength() < 60 or net.getEdge(src_edge).getType() == "highway.primary_link":
+    if net.getEdge(src_edge).getLength() < 75 or net.getEdge(dst_edge).getLength() < 75 or net.getEdge(
+            src_edge).getType() == "highway.primary_link":
         return None, None, None, primary_count
-    #if net.getEdge(src_edge).getLength() < 25 or net.getEdge(dst_edge).getLength() < 25 or net.getEdge(src_edge).getType() == "highway.primary":
+    # if net.getEdge(src_edge).getLength() < 25 or net.getEdge(dst_edge).getLength() < 25 or net.getEdge(src_edge).getType() == "highway.primary":
     #    return None, None, None
 
     path, _ = net.getFastestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
     if path is None:
         return None, None, None, primary_count
 
-    # Check if the selected source edge is a primary link.
-    if net.getEdge(src_edge).getType() == "highway.primary":
-        primary_count += 1  # Increment the count if it's a primary link.
+    # # Check if the selected source edge is a primary link.
+    # if net.getEdge(src_edge).getType() == "highway.primary":
+    #     primary_count += 1  # Increment the count if it's a primary link.
 
     final_edges = [edge.getID() for edge in path]
     final_nodes = [node.getID() for edge in path for node in (edge.getFromNode(), edge.getToNode())]
