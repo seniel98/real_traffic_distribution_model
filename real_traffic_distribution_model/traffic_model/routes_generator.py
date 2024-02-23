@@ -79,7 +79,7 @@ def filter_not_suitable_edges(net, roundabouts):
     not_suitable_edges = []
     not_suitable_edges_set = set()
     for edge in net.getEdges():
-        if edge.getID() in roundabouts or edge.getLength() < 50 or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
+        if edge.getID() in roundabouts or edge.getLength() < 50 or edge.getType() == "highway.primary" or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
             not_suitable_edges.append(str(edge.getID()))
 
     not_suitable_edges_set.update(not_suitable_edges)
@@ -271,6 +271,7 @@ def create_od_routes(options, net):
                         print(f'Vehicles remaining: {vehicles_remaining}')
                         print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
                         print(f'Total execution time: {(total_exec_time / 1000):.2f} seconds')
+
                         # print(
                         #     f'MSE: {mean_squared_error(real_traffic_df["n_vehicles"], (real_traffic_df["n_vehicles"] - traffic_df["n_vehicles"])):.2f}')
                     print_number += 1
@@ -303,14 +304,13 @@ def create_od_routes(options, net):
         f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}_net_edited.csv',
         index=False)
 
-
 def calculate_route(src_point, des_point, net, not_suitable_edges):
     src_lat, src_lon = src_point
     des_lat, des_lon = des_point
     src_x, src_y = net.convertLonLat2XY(src_lon, src_lat)
     des_x, des_y = net.convertLonLat2XY(des_lon, des_lat)
-    edges_set_start = net.getNeighboringEdges(src_x, src_y, r=100)
-    edges_set_end = net.getNeighboringEdges(des_x, des_y, r=100)
+    edges_set_start = net.getNeighboringEdges(src_x, src_y, r=250)
+    edges_set_end = net.getNeighboringEdges(des_x, des_y, r=250)
 
     if edges_set_start is not None and edges_set_end is not None and len(edges_set_start) > 0 and len(
             edges_set_end) > 0:
