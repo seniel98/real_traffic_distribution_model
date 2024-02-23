@@ -115,9 +115,9 @@ def write_additional_file(name, sim_type, vehicle_type_dict):
             f'\t<edgeData id="edges_traffic_measures_data_agg" file="edges_traffic_data_agg_{name}_{sim_type}.xml" excludeEmpty="true"/>\n')
         for vehicle_type, _ in vehicle_type_dict.items():
             additional_file.write(
-                f'\t<edgeData id="edges_emissions_data_{vehicle_type}" type="emissions" file="edges_emissions_data_{vehicle_type}_{name}_{sim_type}.xml" excludeEmpty="true" vType="{vehicle_type}"/>\n')
+                f'\t<edgeData id="edges_emissions_data_{vehicle_type}" type="emissions" file="edges_emissions_data_{vehicle_type}_{name}_{sim_type}.xml" excludeEmpty="true" vTypes="{vehicle_type}"/>\n')
             additional_file.write(
-                    f'\t<edgeData id="edges_traffic_measures_data_{vehicle_type}" file="edges_traffic_data_{vehicle_type}_{name}_{sim_type}.xml" excludeEmpty="true" vType="{vehicle_type}"/>\n')
+                    f'\t<edgeData id="edges_traffic_measures_data_{vehicle_type}" file="edges_traffic_data_{vehicle_type}_{name}_{sim_type}.xml" excludeEmpty="true" vTypes="{vehicle_type}"/>\n')
         additional_file.write("</additional>\n")
 
 

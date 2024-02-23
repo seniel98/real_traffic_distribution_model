@@ -39,7 +39,7 @@ def get_options():
     optParser.add_option("--rd", "--routes_data", dest="routes_data", default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_1p_1.1_v2_full.csv",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
-                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/network_data.db", help="Name of a database")
+                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/network_data_edited.db", help="Name of a database")
     optParser.add_option("--tdb", "--traffic_db", dest="traffic_db",
                          default="/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation.db", help="Name of a database")
     optParser.add_option("--useTool", dest="useTool",
@@ -76,6 +76,8 @@ def get_options():
                          help="Generate the o-d matrix for the traffic data", action="store_true")
     optParser.add_option("--generate_vehicles", dest="generate_vehicles",
                          help="Generate the vehicles distribution in time for the traffic data", action="store_true")
+    optParser.add_option("--veh-per-district", dest="veh_per_district",
+                         help="Vehicles per district file")
 
     (options, args) = optParser.parse_args()
 

@@ -513,6 +513,8 @@ def get_coord_from_node(db, node_id):
     cursor.execute(sql_sentence)
     result_row = cursor.fetchall()
     if result_row:
+        # Close the database
+        db.close()
         return result_row[0]
     else:
         return None

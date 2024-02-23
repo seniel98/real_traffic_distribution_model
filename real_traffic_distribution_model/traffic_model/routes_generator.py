@@ -1,13 +1,15 @@
 import sys
-import time
-
+import geopandas as gpd
+import sumolib.route
+from shapely.geometry import Point, Polygon
 import pandas as pd
 import sqlite3
 import random
 import numpy as np
 from geopy.distance import geodesic
 from datetime import datetime
-
+from geopy.point import Point
+import json
 from numpy.random import randint
 
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
@@ -20,7 +22,26 @@ percentage = 25
 tolerated_error = 1.1
 
 primary_count = 0
-roundabouts = set()
+
+
+# Convert the 'geo_shape' column to geometries
+def parse_polygon(geojson_str):
+    try:
+        if geojson_str == "0":
+            return None
+        else:
+            return Polygon(json.loads(geojson_str)['coordinates'][0])
+    except (ValueError, KeyError):
+        return None
+
+
+# Convert 'coord_node' strings to Point geometries
+def parse_point(coord_str):
+    try:
+        lat, lon = map(float, coord_str.strip('()').split(','))
+        return Point(lon, lat)  # Ensure it's (longitude, latitude)
+    except ValueError:
+        return None
 
 
 def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
@@ -39,14 +60,12 @@ def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
     """
     n_vehicles = df[df['ATA'] == ata]['n_vehicles'].to_list()
     n_vehicles_copy = get_n_vehicles_from_db(sqlite3.connect(options.traffic_db), ata)
-    if n_vehicles and n_vehicles_copy:
+    if n_vehicles_copy is not None and n_vehicles is not None:
         if float(n_vehicles_copy) != 0.0:
-            if is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 1.0:
+            if (is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 1.0) or \
+                    (not is_src_or_des and abs(
+                        (n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= tolerated_error):
                 # print("Number of vehicles for ATA source or destination exceeds limit")
-                return False
-            elif not is_src_or_des and abs(
-                    (n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= tolerated_error:
-                # print("Number of vehicles for ATA intermediate exceeds limit")
                 return False
             else:
                 return True
@@ -54,6 +73,81 @@ def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
             return False
     else:
         return True
+
+
+def filter_not_suitable_edges(net, roundabouts):
+    not_suitable_edges = []
+    not_suitable_edges_set = set()
+    for edge in net.getEdges():
+        if edge.getID() in roundabouts or edge.getLength() < 50 or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
+            not_suitable_edges.append(str(edge.getID()))
+
+    not_suitable_edges_set.update(not_suitable_edges)
+    return not_suitable_edges_set
+
+
+def edge_to_coordinates(edge, net):
+    # Using the starting node of the edge for simplicity
+    x, y = edge.getFromNode().getCoord()
+    lon, lat = net.convertXY2LonLat(x, y)
+    return round(lat, 5), round(lon, 5)
+
+
+def select_edge(suitable_edges):
+    return random.choice(suitable_edges)
+
+
+def get_district_of_ATA(ata, df):
+    if ata:
+        return df[df['ATA'] == ata]['district_code'].values[0]
+    else:
+        return None
+
+
+def select_district(df, src_district=None):
+    if src_district:
+        # Filter the dataframe without the district of the source
+        df = df[df['district_code'] != src_district]
+    district_list = df['district_code'].to_list()
+    n_vehicles = df['n_vehicles'].to_list()
+    abs_n_vehicles = np.abs(n_vehicles)
+    total_vehicles = np.sum(abs_n_vehicles)
+    n_vehicles_prob = np.true_divide(abs_n_vehicles, total_vehicles)
+    selected_district = np.random.choice(district_list, 1, p=n_vehicles_prob)
+    return selected_district[0]
+
+
+def select_origin_destination(options, df, veh_per_district_df, is_dest=False, src_point=None, src_district=None):
+    if not is_dest:
+        df_district_filtered = df.copy()
+        # Select district
+        district = select_district(veh_per_district_df)
+        # Filter the dataframe by the selected district
+        df_district_filtered = df_district_filtered[df_district_filtered['district_code'] == district]
+        # Selecting origin
+        ata, point = select_point(options, df_district_filtered)
+    else:
+        df_district_filtered = df.copy()
+        # Select district
+        district = select_district(veh_per_district_df, src_district=src_district)
+        # Filter the dataframe for the selected district
+        df_district_filtered = df_district_filtered[df_district_filtered['district_code'] == district]
+        # Selecting destination
+        df_coord_filtered = df_district_filtered.copy()
+
+        for index, row in df_district_filtered.iterrows():
+            # 1,25 km is based on the assumption that a person walks 1,25 km in 15 minutes and in bicycle 1,25 km in 6 minutes
+            if geodesic(src_point, eval(row['coord_node'])).m < 1250:
+                df_coord_filtered.drop(index, axis=0, inplace=True)
+            # # Drop all the nodes that are in the same district as the source
+            # if src_district and row['district_code'] == src_district:
+            #     df_coord_filtered.drop(index, axis=0, inplace=True)
+
+        if len(df_coord_filtered) > 0:
+            ata, point = select_point(options, df=df_coord_filtered)
+        else:
+            return None, None, None
+    return ata, point, district
 
 
 def create_od_routes(options, net):
@@ -68,12 +162,32 @@ def create_od_routes(options, net):
 
     traffic_df = pd.read_csv(options.traffic_file)
 
+    veh_per_district_df = pd.read_csv(options.veh_per_district)
+
+    # veh_per_district_df['geometry'] = veh_per_district_df['geo_shape'].apply(parse_polygon)
+    #
+    # # Filter out rows with invalid geometries
+    # veh_per_district_gdf = gpd.GeoDataFrame(veh_per_district_df, geometry='geometry')
+    #
+    # traffic_df['geometry'] = traffic_df['coord_node'].apply(parse_point)
+    #
+    # # Filter out rows with invalid geometries
+    # traffic_gdf = gpd.GeoDataFrame(traffic_df.dropna(subset=['geometry']), geometry='geometry')
+
+    roundabouts = set()
+
     passenger_cars = 0.72
     vehicle_not_parking = 0.85
 
     # Apply vectorized operations for efficiency
     traffic_df['n_vehicles'] = (traffic_df['n_vehicles'] * passenger_cars * vehicle_not_parking).astype(int)
 
+    # Copy the original traffic dataframe to compare it later
+    real_traffic_df = traffic_df.copy()
+
+    # Sort real_traffic and traffic_df by ATA
+    traffic_df.sort_values(by='ATA', inplace=True)
+    real_traffic_df.sort_values(by='ATA', inplace=True)
     # Get the edges for the roundabouts
     for roundabout in net.getRoundabouts():
         roundabouts.update(roundabout.getEdges())
@@ -91,89 +205,83 @@ def create_od_routes(options, net):
     global_ata_list = []
     print_number = 0
     total_exec_time = 0
+
+    not_suitable_edges = filter_not_suitable_edges(net, roundabouts)
+
     # The above code is generating routes for the given percentage of vehicles.
     while total_vehicles > int((total_vehicles_copy * (1 - (percentage / 100)))):
 
         if not is_reiterating:
             exec_time_start = datetime.now()
 
-        src_ata, src_point = select_point(options, df=traffic_df)
-        traffic_df_filtered = traffic_df.copy()
-
-        for index, row in traffic_df.iterrows():
-            if geodesic(src_point, eval(row['coord_node'])).m < 2000:
-                traffic_df_filtered.drop(index, axis=0, inplace=True)
-
-        des_ata, des_point = select_point(options, df=traffic_df_filtered, is_filtered=True)
-
-        # src_lat, src_lon = src_point
-        # des_lat, des_lon = des_point
-
-        # coord_route = generate_route(options, src_lat, src_lon, des_lat, des_lon, process_route)
-        # ways_id = rtdm.get_route_from_ABATIS(options, src_lat, src_lon, des_lat, des_lon, process_route)
-        # if ways_id is None:
-        #     is_reiterating = True
-        #     continue
-
-        # coords_route, nodes_route, edges_route, primary_count = rtdm.coordinates_to_edge(ways_id, net, primary_count, roundabouts)
-        # print(f"Source point: {src_point}")
-        # print(f"Destination point: {des_point}")
-        # coords_route, nodes_route, edges_route, primary_count = rtdm.coordinates_to_edge([src_point, des_point], net, primary_count,
-        #                                                                                  roundabouts)
-
-        coords_route, nodes_route, edges_route = calculate_route(sqlite3.connect(options.dbPath), src_point, des_point,
-                                                                 net, roundabouts)
-        if coords_route is None or nodes_route is None or edges_route is None:
+        src_ata, src_point, src_district = select_origin_destination(options, traffic_df, veh_per_district_df)
+        if src_point is None:
             is_reiterating = True
             continue
 
-        route_ata_list = []
-        if is_n_vehicles_ok(options, src_ata, traffic_df, is_src_or_des=True) and is_n_vehicles_ok(options,
-                                                                                                   des_ata,
-                                                                                                   traffic_df,
-                                                                                                   is_src_or_des=True):
-            route_ata_list.append(src_ata)
-            for i in range(0, len(nodes_route) - 1):
-                # node_int = nodes_route[i][0]
-                node_int = nodes_route[i]
-                ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), str(node_int))
-                if is_n_vehicles_ok(options, ata, traffic_df):
-                    if ata is not None and ata not in route_ata_list and ata != des_ata:
-                        route_ata_list.append(ata)
-                    if i == (len(nodes_route) - 2):
-                        route_ata_list.append(des_ata)
+        # Make sure column coord_node is a string
+        traffic_df['coord_node'] = traffic_df['coord_node'].astype(str)
 
-                        for ata in route_ata_list:
-                            row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
-                            traffic_df.at[row_index[0], 'n_vehicles'] = np.int64(
-                                (traffic_df.at[row_index[0], 'n_vehicles'].item() - 1))
+        des_ata, des_point, des_district = select_origin_destination(options, traffic_df, veh_per_district_df,
+                                                                     is_dest=True,
+                                                                     src_point=src_point)
 
-                        route_id_list.append(f'{edges_route[0]}_to_{edges_route[len(edges_route) - 1]}')
-                        route_list.append(edges_route)
-                        coord_route_list.append(coords_route)
-                        global_ata_list.append(route_ata_list)
-                        total_vehicles = np.sum(traffic_df['n_vehicles'].to_numpy())
+        if des_point is not None:
+            coords_route, nodes_route, edges_route = calculate_route(src_point, des_point, net, not_suitable_edges)
+            # Check if any of the route components is not None to proceed
+            if any(route is not None for route in [coords_route, nodes_route, edges_route]):
+                route_ata_list = []
 
-                        vehicles_remaining = int(total_vehicles) - int(
-                            (total_vehicles_copy * (1 - (percentage / 100))))
+                # Check if the number of vehicles is okay for both source and destination
+                if is_n_vehicles_ok(options, src_ata, traffic_df, is_src_or_des=True) and \
+                        is_n_vehicles_ok(options, des_ata, traffic_df, is_src_or_des=True):
+                    # if src_ata:
+                    #     route_ata_list.append(src_ata)
+                    for i, node in enumerate(nodes_route):  # Exclude the last node for now
+                        ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), str(node))
+                        if ata and ata not in route_ata_list and ata != des_ata and is_n_vehicles_ok(
+                                options, ata,
+                                traffic_df):
+                            route_ata_list.append(ata)
+                    # if des_ata:
+                    #     route_ata_list.append(des_ata)
 
-                        exec_time_end = datetime.now()
-                        exec_time = exec_time_end.timestamp() * 1000 - exec_time_start.timestamp() * 1000
-                        total_exec_time += exec_time
-                        exec_time_list.append(exec_time)
+                    for ata in route_ata_list:
+                        row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
+                        traffic_df.at[row_index[0], 'n_vehicles'] -= 1
+                        district = traffic_df.at[row_index[0], 'district_code']
+                        row_index_district = veh_per_district_df.loc[
+                            veh_per_district_df['district_code'] == district].index
+                        veh_per_district_df.at[row_index_district[0], 'n_vehicles'] -= 1
 
-                        if print_number % 10 == 0:
-                            print(f'Vehicles remaining: {vehicles_remaining}')
-                            print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
-                            # route_is_possible = True
-                            print(f'Total execution time: {(total_exec_time / 1000):.2f} seconds')
-                        print_number += 1
+                    route_id_list.append(f'{edges_route[0]}_to_{edges_route[-1]}')
+                    route_list.append(edges_route)
+                    coord_route_list.append(coords_route)
+                    global_ata_list.append(route_ata_list)
 
-                        is_reiterating = False
+                    # Update vehicles count and execution time
+                    total_vehicles = traffic_df['n_vehicles'].sum()
+                    vehicles_remaining = int(total_vehicles) - int(total_vehicles_copy * (1 - (percentage / 100)))
+                    exec_time_end = datetime.now()
+                    exec_time = exec_time_end.timestamp() * 1000 - exec_time_start.timestamp() * 1000
+                    total_exec_time += exec_time
+                    exec_time_list.append(exec_time)
+
+                    if print_number % 10 == 0:
+                        print(f'Vehicles remaining: {vehicles_remaining}')
+                        print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
+                        print(f'Total execution time: {(total_exec_time / 1000):.2f} seconds')
+                        # print(
+                        #     f'MSE: {mean_squared_error(real_traffic_df["n_vehicles"], (real_traffic_df["n_vehicles"] - traffic_df["n_vehicles"])):.2f}')
+                    print_number += 1
+
+                    is_reiterating = False
                 else:
                     is_reiterating = True
-                    break
-
+                    continue
+            else:
+                is_reiterating = True
+                continue
         else:
             is_reiterating = True
             continue
@@ -196,29 +304,32 @@ def create_od_routes(options, net):
         index=False)
 
 
-def calculate_route(db, src_point, des_point, net, roundabouts):
+def calculate_route(src_point, des_point, net, not_suitable_edges):
     src_lat, src_lon = src_point
     des_lat, des_lon = des_point
-    edges_set_start = rtdm.coord_to_edges(db, src_lat, src_lon)
-    edges_set_end = rtdm.coord_to_edges(db, des_lat, des_lon)
+    src_x, src_y = net.convertLonLat2XY(src_lon, src_lat)
+    des_x, des_y = net.convertLonLat2XY(des_lon, des_lat)
+    edges_set_start = net.getNeighboringEdges(src_x, src_y, r=100)
+    edges_set_end = net.getNeighboringEdges(des_x, des_y, r=100)
 
-    # print(f"Source edge: {edges_set_start}")
-    # print(f"Destination edge: {edges_set_end}")
-
-    if edges_set_start is not None or edges_set_end is not None:
-
-        src_edge = str(edges_set_start[randint(0, len(edges_set_start) - 1)][0] if len(edges_set_start) > 1 else
-                       edges_set_start[0][0])
-        dst_edge = str(
+    if edges_set_start is not None and edges_set_end is not None and len(edges_set_start) > 0 and len(
+            edges_set_end) > 0:
+        src_edge = (edges_set_start[randint(0, len(edges_set_start) - 1)][0] if len(edges_set_start) > 1 else
+                    edges_set_start[0][0])
+        dst_edge = (
             edges_set_end[randint(0, len(edges_set_end) - 1)][0] if len(edges_set_end) > 1 else edges_set_end[0][0])
 
-        if (src_edge not in roundabouts or dst_edge not in roundabouts) and (
-                net.getEdge(src_edge).getLength() > 75 or net.getEdge(dst_edge).getLength() > 75 or net.getEdge(
-                src_edge).getType() != "highway.primary_link"):
+        src_edge = src_edge.getID()
+        dst_edge = dst_edge.getID()
 
-            path, _ = net.getFastestPath(net.getEdge(src_edge), net.getEdge(dst_edge))
+        if src_edge not in not_suitable_edges and dst_edge not in not_suitable_edges:
+
+            path, _ = net.getOptimalPath(net.getEdge(src_edge), net.getEdge(dst_edge),
+                                         fastest=bool(random.getrandbits(1)))
             if path is not None:
                 final_edges = [edge.getID() for edge in path]
+                if sumolib.route.getLength(net, final_edges) < 1250:
+                    return None, None, None
                 final_nodes = [node.getID() for edge in path for node in (edge.getFromNode(), edge.getToNode())]
                 final_coords = [net.convertXY2LonLat(*net.getNode(node).getCoord()) for node in final_nodes]
 
@@ -233,7 +344,7 @@ def process_route(data):
     return data
 
 
-def select_point(options, df=None, is_filtered=False):
+def select_point(options, df=None):
     """
     This function takes a dataframe and a list of ATA codes, and returns the ATA code and the coordinates of the point
     that is closest to the center of the dataframe
@@ -247,61 +358,11 @@ def select_point(options, df=None, is_filtered=False):
       ata, point
     """
 
-    ata_list = get_ATA_list_from_db(sqlite3.connect(options.traffic_db))
-    ata, point = get_coord_for_ata(df, ata_list, is_filtered=is_filtered, options=options)
+    ata, point = get_coord_for_ata(df, options=options)
     return ata, point
 
 
-def softmax(x):
-    """Compute softmax values for each set of scores in x."""
-    e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=0)
-
-
-def get_coord_for_ata(df, ata_list, is_filtered=False, options=None, prev_selected_ata=None):
-    """
-    The function takes in a dataframe, a list of ATA codes, a boolean value indicating whether the dataframe is filtered
-    or not, a dictionary of options, and the previously selected ATA code. It returns the selected ATA code and the point
-    (latitude and longitude) of the selected ATA, with a more distributed selection process.
-
-    Args:
-      df: The dataframe containing the data
-      ata_list: list of ATA codes
-      is_filtered: If True, the function will use the ATA list from the dataframe. If False, it will use the list passed as
-                   an argument. Defaults to False
-      options: The options object that contains the path to the database.
-      prev_selected_ata: The ATA code selected in the previous call to this function, to prevent consecutive selections.
-
-    Returns:
-      the selected ATA and the point (lat, lon)
-    """
-    if is_filtered:
-        ata_list = df['ATA'].to_list()
-    n_vehicles = df['n_vehicles'].to_list()
-    abs_n_vehicles = np.abs(n_vehicles)
-    total_vehicles = np.sum(abs_n_vehicles)
-    n_vehicles_prob = np.true_divide(abs_n_vehicles, total_vehicles)
-    n_vehicles_prob = softmax(n_vehicles_prob)  # Apply softmax to smooth probabilities
-
-    # Reduce the probability of previously selected ATA to distribute the selection
-    if prev_selected_ata is not None and prev_selected_ata in ata_list:
-        index = ata_list.index(prev_selected_ata)
-        n_vehicles_prob[index] *= 0.5  # Halve the probability of the previously selected ATA
-
-    point = None
-    selected_ata = None
-    while point is None:
-        selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
-        nodes = get_nodes_from_db(sqlite3.connect(options.traffic_db), selected_ata[0])
-        nodes = nodes[0].split(" ")
-        if nodes:  # Ensure nodes list is not empty
-            node = random.choice(nodes)
-            point = rtdm.get_coord_from_node(sqlite3.connect(options.dbPath), node)
-
-    return selected_ata[0], point
-
-
-def get_coord_for_ata_v_old(df, ata_list, is_filtered=False, options=None):
+def get_coord_for_ata(df, options=None):
     """
     The function takes in a dataframe, a list of ATA codes, and a boolean value indicating whether the dataframe is filtered
     or not. It also takes in a dictionary of options. The function returns the selected ATA code and the point (latitude and
@@ -309,29 +370,32 @@ def get_coord_for_ata_v_old(df, ata_list, is_filtered=False, options=None):
 
     Args:
       df: The dataframe containing the data
-      ata_list: list of ATA codes
-      is_filtered: If True, the function will use the ATA list from the dataframe. If False, it will use the list passed as
-    an argument. Defaults to False
       options: The options object that contains the path to the database.
 
     Returns:
       the selected ATA and the point (lat, lon)
     """
     global selected_ata
-    if is_filtered:
-        ata_list = df['ATA'].to_list()
+    ata_list = df['ATA'].to_list()
     n_vehicles = df['n_vehicles'].to_list()
     abs_n_vehicles = np.abs(n_vehicles)
     total_vehicles = np.sum(abs_n_vehicles)
     n_vehicles_prob = np.true_divide(abs_n_vehicles, total_vehicles)
     point = None
-    # Selecting a random node from the list of nodes in the selected ATA.
-    while point is None:
+    # Max iterations to avoid infinite loop
+    for i in range(0, 1000):
         selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
         nodes = get_nodes_from_db(sqlite3.connect(options.traffic_db), selected_ata[0])
         nodes = nodes[0].split(" ")
         node = random.choice(nodes)
         point = rtdm.get_coord_from_node(sqlite3.connect(options.dbPath), node)
+        if point:
+            break
+
+    # Generate a new destination point within 500m radius of the selected point
+    # new_point = generate_random_point(point, max_distance=500)
+    # new_ata = get_ATA_from_db(sqlite3.connect(options.traffic_db),
+    #                           rtdm.coord_2_node(sqlite3.connect(options.dbPath), new_point[0], new_point[1]))
     return selected_ata[0], point
 
 
