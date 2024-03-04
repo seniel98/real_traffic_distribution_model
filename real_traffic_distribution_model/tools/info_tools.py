@@ -509,7 +509,7 @@ def get_coord_from_node(db, node_id):
   """
 
     cursor = db.cursor()
-    sql_sentence = f'select nodes.lat,nodes.lon from nodes where nodes.id={node_id}'
+    sql_sentence = f'select nodes.lat,nodes.lon from nodes where nodes.id="{node_id}"'
     cursor.execute(sql_sentence)
     result_row = cursor.fetchall()
     if result_row:

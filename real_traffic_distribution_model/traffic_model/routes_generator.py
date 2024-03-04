@@ -239,13 +239,12 @@ def create_od_routes(options, net):
                     #     route_ata_list.append(src_ata)
                     for i, node in enumerate(nodes_route):  # Exclude the last node for now
                         ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), str(node))
-                        if ata and ata not in route_ata_list and ata != des_ata and is_n_vehicles_ok(
-                                options, ata,
-                                traffic_df):
+                        if ata and is_n_vehicles_ok(options, ata, traffic_df):
                             route_ata_list.append(ata)
                     # if des_ata:
                     #     route_ata_list.append(des_ata)
-
+                    # Remove duplicates
+                    route_ata_list = list(set(route_ata_list))
                     for ata in route_ata_list:
                         row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
                         traffic_df.at[row_index[0], 'n_vehicles'] -= 1
@@ -303,6 +302,7 @@ def create_od_routes(options, net):
     traffic_df.to_csv(
         f'/home/josedaniel/Modelo_distrib_trafico_real/traffic_data/csv/traffic_df_modified_{str(percentage)}p_{str(tolerated_error)}_net_edited.csv',
         index=False)
+
 
 def calculate_route(src_point, des_point, net, not_suitable_edges):
     src_lat, src_lon = src_point
@@ -386,7 +386,7 @@ def get_coord_for_ata(df, options=None):
     for i in range(0, 1000):
         selected_ata = np.random.choice(ata_list, 1, p=n_vehicles_prob)
         nodes = get_nodes_from_db(sqlite3.connect(options.traffic_db), selected_ata[0])
-        nodes = nodes[0].split(" ")
+        nodes = eval(nodes[0])
         node = random.choice(nodes)
         point = rtdm.get_coord_from_node(sqlite3.connect(options.dbPath), node)
         if point:
