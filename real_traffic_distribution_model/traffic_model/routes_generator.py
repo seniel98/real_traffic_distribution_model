@@ -63,10 +63,10 @@ def is_n_vehicles_ok(options, ata, df, is_src_or_des=False):
     n_vehicles_copy = get_n_vehicles_from_db(sqlite3.connect(options.traffic_db), ata)
     if n_vehicles_copy is not None and n_vehicles is not None:
         if float(n_vehicles_copy) != 0.0:
-            if (is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 1.0) or \
-                    (not is_src_or_des and abs(
-                        (n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= tolerated_error):
-                # print("Number of vehicles for ATA source or destination exceeds limit")
+            if (is_src_or_des and abs((n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= 1.0):
+                return False
+            elif not is_src_or_des and abs(
+                    (n_vehicles_copy - n_vehicles[0]) / float(n_vehicles_copy)) >= tolerated_error:
                 return False
             else:
                 return True
@@ -80,7 +80,7 @@ def filter_not_suitable_edges(net, roundabouts):
     not_suitable_edges = []
     not_suitable_edges_set = set()
     for edge in net.getEdges():
-        if edge.getID() in roundabouts or edge.getLength() < 50 or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
+        if edge.getID() in roundabouts or edge.getLength() < 50 or edge.getType() == "highway.primary" or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
             not_suitable_edges.append(str(edge.getID()))
 
     not_suitable_edges_set.update(not_suitable_edges)
@@ -90,7 +90,7 @@ def filter_not_suitable_edges(net, roundabouts):
 def filter_suited_edges(net, roundabouts):
     suited_rows = []  # List to hold all rows of edge_id and coord_node pairs
     for edge in net.getEdges():
-        if edge.getID() not in roundabouts and edge.getLength() > 50 and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
+        if edge.getID() not in roundabouts and edge.getLength() > 50 and edge.getType() != "highway.primary" and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
             edge_id = str(edge.getID())
             for coord in edge.getRawShape():
                 # Convert the coordinates to lat, lon
@@ -137,9 +137,9 @@ def get_district_of_ATA(ata, df):
 
 
 def select_district(df, src_district=None):
-    if src_district:
-        # Filter the dataframe without the district of the source
-        df = df[df['district_code'] != src_district]
+    # if src_district:
+    #     # Filter the dataframe without the district of the source
+    #     df = df[df['district_code'] != src_district]
     district_list = df['district_code'].to_list()
     n_vehicles = df['n_vehicles'].to_list()
     abs_n_vehicles = np.abs(n_vehicles)
@@ -168,7 +168,7 @@ def select_point_from_kriging(df):
     coord_node_list = df['coord_node'].to_list()
     n_vehicles = df['n_vehicles'].to_list()
     total_vehicles = np.sum(n_vehicles)
-    n_vehicles_prob = np.true_divide(n_vehicles, total_vehicles)
+    n_vehicles_prob = np.true_divide(n_vehicles, np.abs(total_vehicles))
     selected_point = np.random.choice(coord_node_list, 1, p=n_vehicles_prob)
     return eval(selected_point[0])
 
@@ -286,6 +286,9 @@ def create_od_routes(options, net):
     # Apply vectorized operations for efficiency
     traffic_df['n_vehicles'] = (traffic_df['n_vehicles'] * passenger_cars * vehicle_not_parking).astype(int)
 
+    # To csv
+    # traffic_df.to_csv("/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation_adapted_district.csv", index=False)
+
     # Copy the original traffic dataframe to compare it later
     real_traffic_df = traffic_df.copy()
 
@@ -329,7 +332,7 @@ def create_od_routes(options, net):
     # kriging_ata_df.to_csv("/home/josedaniel/Algoritmo_rutas_eco/kriging_ata_df.csv", index=False)
 
     # Aggregate the number of vehicles per district
-    veh_per_district_df = kriging_ata_df.groupby('district_code').agg({'n_vehicles': 'sum'}).reset_index()
+    veh_per_district_df = kriging_ata_df.groupby('district_code').agg({'n_vehicles': 'mean'}).reset_index()
 
     # The above code is generating routes for the given percentage of vehicles.
     while total_vehicles > int((total_vehicles_copy * (1 - (percentage / 100)))):
@@ -365,11 +368,11 @@ def create_od_routes(options, net):
 
                     for i, node in enumerate(nodes_route):  # Exclude the last node for now
                         ata = get_ATA_from_db(sqlite3.connect(options.traffic_db), str(node))
-                        if ata and ata not in route_ata_list and ata != des_ata and is_n_vehicles_ok(
-                                options, ata,
-                                traffic_df):
+                        if ata is not None and is_n_vehicles_ok(options, ata, traffic_df):
                             route_ata_list.append(ata)
 
+                    # Make sure ATA list has no duplicates
+                    route_ata_list = list(set(route_ata_list))
                     for ata in route_ata_list:
                         row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
                         traffic_df.at[row_index[0], 'n_vehicles'] -= 1
