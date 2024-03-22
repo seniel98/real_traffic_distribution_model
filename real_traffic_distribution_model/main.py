@@ -78,6 +78,8 @@ def get_options():
                          help="Generate the vehicles distribution in time for the traffic data", action="store_true")
     optParser.add_option("--veh-per-district", dest="veh_per_district",
                          help="Vehicles per district file")
+    optParser.add_option("--kriging-ata-file", dest="kriging_ata_file",
+                         help="Kriging ata file")
 
     (options, args) = optParser.parse_args()
 

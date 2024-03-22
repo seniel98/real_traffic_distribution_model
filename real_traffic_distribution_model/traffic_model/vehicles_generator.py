@@ -12,7 +12,7 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 # generate random values from Poisson distribution with mean=3 and sample size=10
 
 PERIOD = 3600
-percentage = 25
+percentage = 50
 tolerated_error = 1.1
 
 
@@ -97,7 +97,7 @@ def generate_vehicles_distribution(options):
 
     vehicle_data = {'vehicle_id': vehicle_list, 'depart': time_list, 'departLane': ["best"] * len(vehicle_list),
                     'departPos': ["last"] * len(vehicle_list),
-                    'departSpeed': ["max"] * len(vehicle_list),
+                    'departSpeed': ["avg"] * len(vehicle_list),
                     'route': route_list}
     vehicle_df = pd.DataFrame.from_dict(vehicle_data)
     vehicle_df_clean = vehicle_df.drop_duplicates(subset=['vehicle_id'])
