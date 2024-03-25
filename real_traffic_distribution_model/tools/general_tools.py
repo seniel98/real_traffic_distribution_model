@@ -1,3 +1,5 @@
+import ast
+import json
 import math
 import os
 import re
@@ -5,8 +7,11 @@ import socket
 import sqlite3
 import sys
 from xml.etree import ElementTree
-
+import geopandas as gpd
+import numpy as np
 import pandas as pd
+from pykrige import OrdinaryKriging
+from shapely import Point, Polygon
 
 # Important to execute it from terminal. This add the module to the PYTHONPATH
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
@@ -371,3 +376,146 @@ def is_edge(options, db, node_from, node_to):
     else:
         edge = str(0)
     return edge
+
+
+def create_dataframe(interpolated_coords):
+    df = pd.DataFrame(interpolated_coords, columns=['lon', 'lat'])
+    df['coord_node'] = list(zip(df.lat, df.lon))
+    df.drop(columns=['lat', 'lon'], inplace=True)
+    # Sort the dataframe by the coord_node column
+    df.sort_values(by=['coord_node'], inplace=True)
+    return df
+
+
+def add_point_to_dataframe(df, interpolated_vehicle_values, total_values):
+    df["n_vehicles"] = np.reshape(interpolated_vehicle_values, [total_values, 1])
+
+
+def create_kriging_df(data_array, min_lat, max_lat, min_lon, max_lon):
+    yi, xi = np.mgrid[min_lat:max_lat:500j, min_lon:max_lon:500j]
+    points = np.vstack((xi.flatten(), yi.flatten())).T
+    kriging_df = create_dataframe(points)
+
+    uk = OrdinaryKriging(data_array[:, 1], data_array[:, 0], data_array[:, 2], variogram_model="exponential",
+                         coordinates_type="geographic")
+    z, ss = uk.execute("points", points[:, 0], points[:, 1])
+    # Reshape the interpolated data back to the original grid shape
+    interpolated_vehicles = z.reshape((int(np.sqrt(len(z))), int(np.sqrt(len(z)))))
+    add_point_to_dataframe(kriging_df, interpolated_vehicles, kriging_df.shape[0])
+
+    # Process the interpolated dataframe
+    kriging_df = process_kriging_df(kriging_df)
+
+    return kriging_df
+
+
+def process_kriging_df(kriging_df):
+    # Change n_vehicles to int
+    kriging_df['n_vehicles'] = kriging_df['n_vehicles'].astype(int)
+
+    # Convert all negative values to absolute values
+    kriging_df['n_vehicles'] = kriging_df['n_vehicles'].abs()
+
+    # Convert coord_node 2nd element from (0, 360) to (-180, 180)
+    kriging_df['coord_node'] = kriging_df['coord_node'].apply(
+        lambda x: (x[0], x[1] - 360 if x[1] > 180 else x[1]))
+
+    return kriging_df
+
+
+def parse_point(coord):
+    try:
+        lat, lon = coord
+        return Point(lon, lat)  # Ensure it's (longitude, latitude)
+    except ValueError:
+        return None
+
+
+# Convert the 'geo_shape' column to geometries
+def parse_polygon(geojson_str):
+    try:
+        return Polygon(json.loads(geojson_str)['coordinates'][0])
+    except (ValueError, KeyError):
+        return None
+
+
+def create_districts_gdf(districts_df):
+    districts_df['population'] = districts_df['population'].astype(int)
+    districts_df['geometry'] = districts_df['geo_shape'].apply(parse_polygon)
+    # Filter out rows with invalid geometries
+    gdf_districts = gpd.GeoDataFrame(districts_df.dropna(subset=['geometry']), geometry='geometry')
+
+    # Set a common CRS (use WGS 84 for latitude/longitude data)
+    gdf_districts.crs = "EPSG:4326"
+
+    return gdf_districts
+
+
+def create_kriging_gdf(kriging_df):
+    # Convert 'coord_node' strings to Point geometries
+    kriging_df['geometry'] = kriging_df['coord_node'].apply(parse_point)
+
+    # Filter out rows with invalid geometries
+    gdf_kriging = gpd.GeoDataFrame(kriging_df.dropna(subset=['geometry']), geometry='geometry')
+
+    # Set a common CRS (use WGS 84 for latitude/longitude data)
+    gdf_kriging.crs = "EPSG:4326"
+
+    return gdf_kriging
+
+
+def create_kriging_district_df(gdf_kriging, gdf_districts):
+    # Perform spatial join
+    kriging_district_df = gpd.sjoin(gdf_kriging, gdf_districts, how="left", op='within')
+
+    # Rename column name to district_name
+    kriging_district_df.rename(columns={"name": "district_name"}, inplace=True)
+
+    # District code as integer if not null
+    kriging_district_df['district_code'] = kriging_district_df['district_code'].fillna(0).astype(int)
+    # Fill nan values with the mean of the population
+    kriging_district_df['population'] = kriging_district_df['population'].fillna(
+        kriging_district_df['population'].mean()).astype(
+        int)
+    # District name as str if not null
+    kriging_district_df['district_name'] = kriging_district_df['district_name'].fillna("None").astype(str)
+
+    # Drop the columns that are not coord_node, ATA, name, district_code, n_vehicles, node, way, and time
+    kriging_district_df = kriging_district_df[['n_vehicles', 'district_code', 'population', 'coord_node']]
+
+    return kriging_district_df
+
+
+def get_net_boundaries(net):
+    # Get the boundaries of the city
+    xmin, ymin, xmax, ymax = net.getBoundary()
+
+    # Convert to lat lon
+    min_lon, min_lat = net.convertXY2LonLat(xmin, ymin)
+    max_lon, max_lat = net.convertXY2LonLat(xmax, ymax)
+
+    return min_lat, max_lat, min_lon, max_lon
+
+
+def convert_from_180_to360(lon):
+    if lon < 0:
+        return 360 + lon
+    return lon
+
+
+def create_traffic_np_array(traffic_df):
+    # Sort the dataframe by the coord_node column
+    traffic_df.sort_values(by=["coord_node"], inplace=True)
+
+    # Convert string representations of tuples in 'coord_node' to actual tuples
+    traffic_df['coord_node'] = traffic_df['coord_node'].apply(ast.literal_eval)
+
+    # Assuming 'coord_node' is a column of tuples (lat, lon)
+    traffic_df[['latitude', 'longitude']] = pd.DataFrame(traffic_df['coord_node'].tolist(), index=traffic_df.index)
+
+    # Convert longitude from (-180, 180) to (0, 360)
+    traffic_df['longitude'] = traffic_df['longitude'].apply(lambda x: x + 360 if x < 0 else x)
+
+    traffic_array = traffic_df[['latitude', 'longitude', 'n_vehicles']].to_numpy()
+
+    return traffic_array
