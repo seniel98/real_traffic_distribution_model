@@ -5,7 +5,6 @@ import random
 import numpy as np
 from geopy.distance import geodesic
 from numpy.random import randint
-import ast
 from tqdm import tqdm
 import sumolib as sumo
 
@@ -14,8 +13,8 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
-
-percentage = 50
+selection_counts = {}
+percentage = 75
 tolerated_error = 1.1
 MAX_N_VEHICLES = 30000
 
@@ -45,7 +44,7 @@ def filter_not_suitable_edges(net, roundabouts):
     not_suitable_edges = []
     not_suitable_edges_set = set()
     for edge in net.getEdges():
-        if edge.getID() in roundabouts or edge.getLength() < 75 or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
+        if edge.getID() in roundabouts or edge.getLength() < 75 or edge.getType() == "highway.primary" or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
             not_suitable_edges.append(str(edge.getID()))
 
     not_suitable_edges_set.update(not_suitable_edges)
@@ -55,7 +54,7 @@ def filter_not_suitable_edges(net, roundabouts):
 def filter_suited_edges(net, roundabouts):
     suited_rows = []  # List to hold all rows of edge_id and coord_node pairs
     for edge in net.getEdges():
-        if edge.getID() not in roundabouts and edge.getLength() > 75 and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
+        if edge.getID() not in roundabouts and edge.getLength() > 75 and edge.getType() != "highway.primary" and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
             edge_id = str(edge.getID())
             for coord in edge.getRawShape():
                 # Convert the coordinates to lat, lon
@@ -83,8 +82,9 @@ def filter_suited_edges(net, roundabouts):
     return pd.DataFrame(suited_rows)
 
 
-def process_kriging_ata_df(net, districts_df, traffic_df, suitable_edges_df):
-    kriging_ata_df = apply_kriging(net, traffic_df, districts_df)
+def process_kriging_ata_df(districts_gdf, traffic_df, max_point, min_point, suitable_edges_df):
+    kriging_ata_df = apply_kriging(traffic_df=traffic_df, max_point=max_point, min_point=min_point,
+                                   districts_gdf=districts_gdf)
     kriging_ata_df = prepare_kriging_df(kriging_ata_df)
 
     # Join the kriging_ata_df with the suitable_edges_df
@@ -97,13 +97,10 @@ def process_kriging_ata_df(net, districts_df, traffic_df, suitable_edges_df):
     return kriging_ata_df
 
 
-def apply_kriging(net, traffic_df, districts_df):
-    min_lat, max_lat, min_lon, max_lon = rtdm.get_net_boundaries(net)
+def apply_kriging(traffic_df, max_point, min_point, districts_gdf):
+    min_lat, min_lon = min_point
+    max_lat, max_lon = max_point
 
-    max_lon = rtdm.convert_from_180_to360(max_lon)
-    min_lon = rtdm.convert_from_180_to360(min_lon)
-
-    # Create traffic np array
     traffic_np = rtdm.create_traffic_np_array(traffic_df)
 
     kriging_df = rtdm.create_kriging_df(traffic_np, min_lat, max_lat, min_lon, max_lon)
@@ -111,11 +108,17 @@ def apply_kriging(net, traffic_df, districts_df):
     kriging_processed_df = rtdm.process_kriging_df(kriging_df)
 
     kriging_gdf = rtdm.create_kriging_gdf(kriging_processed_df)
-    districts_gdf = rtdm.create_districts_gdf(districts_df)
 
     kriging_ata_df = rtdm.create_kriging_district_df(kriging_gdf, districts_gdf)
 
     return kriging_ata_df
+
+
+def process_net_boundaries(net):
+    min_lat, max_lat, min_lon, max_lon = rtdm.get_net_boundaries(net)
+    max_lon = rtdm.convert_from_180_to360(max_lon)
+    min_lon = rtdm.convert_from_180_to360(min_lon)
+    return max_lat, max_lon, min_lat, min_lon
 
 
 def edge_to_coordinates(edge, net):
@@ -141,9 +144,18 @@ def select_district(df, consider_population=False, src_district=None):
         population_prob = np.true_divide(abs_population, total_population)
 
         # Adjust selection probabilities by combining vehicle and population factors
-        selection_prob = (selection_prob + population_prob * 2) / 2
+        selection_prob = (selection_prob + population_prob) / 2
         selection_prob /= np.sum(selection_prob)  # Normalize probabilities
+    # Penalize selection probabilities based on previous selections
+    for i, district in enumerate(district_list):
+        if district in selection_counts:
+            # Decrease probability for districts that have been selected more often
+            # The penalization factor can be adjusted as needed
+            penalization_factor = 1 / (1 + selection_counts[district])
+            selection_prob[i] *= penalization_factor
 
+    # Ensure probabilities sum to 1 after penalization
+    selection_prob /= np.sum(selection_prob)
     selected_district = np.random.choice(district_list, 1, p=selection_prob)
     return selected_district[0]
 
@@ -210,8 +222,8 @@ def calculate_route(src_point, des_point, net, not_suitable_edges):
     des_lat, des_lon = des_point
     src_x, src_y = net.convertLonLat2XY(src_lon, src_lat)
     des_x, des_y = net.convertLonLat2XY(des_lon, des_lat)
-    edges_set_start = net.getNeighboringEdges(src_x, src_y, r=20)
-    edges_set_end = net.getNeighboringEdges(des_x, des_y, r=20)
+    edges_set_start = net.getNeighboringEdges(src_x, src_y, r=30)
+    edges_set_end = net.getNeighboringEdges(des_x, des_y, r=30)
 
     if edges_set_start is not None and edges_set_end is not None and len(edges_set_start) > 0 and len(
             edges_set_end) > 0:
@@ -223,11 +235,10 @@ def calculate_route(src_point, des_point, net, not_suitable_edges):
         src_edge = src_edge.getID()
         dst_edge = dst_edge.getID()
 
-        if net.getEdge(
-                src_edge).getType() != "highway.primary" and src_edge not in not_suitable_edges and dst_edge not in not_suitable_edges:
-
+        if src_edge not in not_suitable_edges and dst_edge not in not_suitable_edges:
+            fastest = random.random() < 0.8
             path, _ = net.getOptimalPath(net.getEdge(src_edge), net.getEdge(dst_edge),
-                                         fastest=random.choice([True, False]))
+                                         fastest=fastest)
             # path, _ = net.getOptimalPath(net.getEdge(src_edge), net.getEdge(dst_edge),
             #                              fastest=True)
 
@@ -325,7 +336,7 @@ def create_od_routes(options, net):
       net: The sumo network
       options: the options object that contains the path to the database and the path to the traffic file
     """
-    global is_reiterating
+    global is_reiterating, selection_counts
 
     route_id_list = []
     route_list = []
@@ -368,7 +379,15 @@ def create_od_routes(options, net):
     # Make sure coord_node is a string
     suitable_edges_df['coord_node'] = suitable_edges_df['coord_node'].astype(str)
 
-    kriging_ata_df = process_kriging_ata_df(net, districts_df, traffic_df, suitable_edges_df)
+    # Create districts GeoDataFrame
+    districts_gdf = rtdm.create_districts_gdf(districts_df)
+
+    # Get the boundaries of the network
+    max_lat, max_lon, min_lat, min_lon = process_net_boundaries(net)
+    max_point = (max_lat, max_lon)
+    min_point = (min_lat, min_lon)
+
+    kriging_ata_df = process_kriging_ata_df(districts_gdf, traffic_df, max_point, min_point, suitable_edges_df)
 
     kriging_ata_df.to_csv("/home/josedaniel/Algoritmo_rutas_eco/kriging_ata_df_start.csv", index=False)
 
@@ -416,6 +435,16 @@ def create_od_routes(options, net):
                     row_index = traffic_df.loc[traffic_df['ATA'] == ata].index
                     traffic_df.at[row_index[0], 'n_vehicles'] -= 1
 
+                # Update selection_counts for the involved districts
+                if src_district in selection_counts:
+                    selection_counts[src_district] += 1
+                else:
+                    selection_counts[src_district] = 1
+
+                if des_district in selection_counts:
+                    selection_counts[des_district] += 1
+                else:
+                    selection_counts[des_district] = 1
                 route_id_list.append(f'{edges_route[0]}_to_{edges_route[-1]}')
                 route_list.append(edges_route)
                 coord_route_list.append(coords_route)
@@ -425,8 +454,9 @@ def create_od_routes(options, net):
                 total_vehicles -= len(route_ata_list)
 
                 # Generate a new veh_per_district_df every 1000 routes
-                if routes_count % 1000 == 0:
-                    kriging_ata_df = process_kriging_ata_df(net, districts_df, traffic_df, suitable_edges_df)
+                if routes_count % 1000 == 0 and routes_count != 0:
+                    kriging_ata_df = process_kriging_ata_df(districts_gdf, traffic_df, max_point, min_point,
+                                                            suitable_edges_df)
                     veh_per_district_df = create_veh_per_district_df(kriging_ata_df)
 
                 if routes_count == max_n_vehicles_percentage - 1:

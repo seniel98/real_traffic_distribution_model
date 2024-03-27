@@ -392,12 +392,12 @@ def add_point_to_dataframe(df, interpolated_vehicle_values, total_values):
 
 
 def create_kriging_df(data_array, min_lat, max_lat, min_lon, max_lon):
-    yi, xi = np.mgrid[min_lat:max_lat:500j, min_lon:max_lon:500j]
+    yi, xi = np.mgrid[min_lat:max_lat:450j, min_lon:max_lon:450j]
     points = np.vstack((xi.flatten(), yi.flatten())).T
     kriging_df = create_dataframe(points)
 
     uk = OrdinaryKriging(data_array[:, 1], data_array[:, 0], data_array[:, 2], variogram_model="exponential",
-                         coordinates_type="geographic")
+                         coordinates_type="geographic", verbose=True)
     z, ss = uk.execute("points", points[:, 0], points[:, 1])
     # Reshape the interpolated data back to the original grid shape
     interpolated_vehicles = z.reshape((int(np.sqrt(len(z))), int(np.sqrt(len(z)))))
@@ -466,7 +466,7 @@ def create_kriging_gdf(kriging_df):
 
 def create_kriging_district_df(gdf_kriging, gdf_districts):
     # Perform spatial join
-    kriging_district_df = gpd.sjoin(gdf_kriging, gdf_districts, how="left", op='within')
+    kriging_district_df = gpd.sjoin(gdf_kriging, gdf_districts, how="left", predicate='within')
 
     # Rename column name to district_name
     kriging_district_df.rename(columns={"name": "district_name"}, inplace=True)
