@@ -14,7 +14,7 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 selection_counts = {}
-percentage = 75
+percentage = 50
 tolerated_error = 1.1
 MAX_N_VEHICLES = 30000
 
@@ -44,7 +44,7 @@ def filter_not_suitable_edges(net, roundabouts):
     not_suitable_edges = []
     not_suitable_edges_set = set()
     for edge in net.getEdges():
-        if edge.getID() in roundabouts or edge.getLength() < 75 or edge.getType() == "highway.primary" or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
+        if edge.getID() in roundabouts or edge.getLength() < 75 or edge.getType() == "highway.primary" or edge.getType() == "highway.motorway" or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
             not_suitable_edges.append(str(edge.getID()))
 
     not_suitable_edges_set.update(not_suitable_edges)
@@ -54,7 +54,7 @@ def filter_not_suitable_edges(net, roundabouts):
 def filter_suited_edges(net, roundabouts):
     suited_rows = []  # List to hold all rows of edge_id and coord_node pairs
     for edge in net.getEdges():
-        if edge.getID() not in roundabouts and edge.getLength() > 75 and edge.getType() != "highway.primary" and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
+        if edge.getID() not in roundabouts and edge.getLength() > 75 and edge.getType() != "highway.primary" and edge.getType() != "highway.motorway "and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
             edge_id = str(edge.getID())
             for coord in edge.getRawShape():
                 # Convert the coordinates to lat, lon

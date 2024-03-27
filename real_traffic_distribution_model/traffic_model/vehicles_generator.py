@@ -12,7 +12,7 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 # generate random values from Poisson distribution with mean=3 and sample size=10
 
 PERIOD = 3600
-percentage = 75
+percentage = 50
 tolerated_error = 1.1
 
 
