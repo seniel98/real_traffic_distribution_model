@@ -36,12 +36,15 @@ def get_options():
                          help="define the input additional filename")
     optParser.add_option("-t", "--traffic_file", dest="traffic_file",
                          help="CSV with the information of the traffic")
-    optParser.add_option("--rd", "--routes_data", dest="routes_data", default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_1p_1.1_v2_full.csv",
+    optParser.add_option("--rd", "--routes_data", dest="routes_data",
+                         default="/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_1p_1.1_v2_full.csv",
                          help="CSV with the information of the routes")
     optParser.add_option("-d", "--db", dest="dbPath",
-                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/network_data_edited.db", help="Name of a database")
+                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficDB/network_data_edited.db",
+                         help="Name of a database")
     optParser.add_option("--tdb", "--traffic_db", dest="traffic_db",
-                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation.db", help="Name of a database")
+                         default="/home/josedaniel/Algoritmo_rutas_eco/TrafficData/way_nodes_relation.db",
+                         help="Name of a database")
     optParser.add_option("--useTool", dest="useTool",
                          action="store_true", help="Mode Use Tool(mandatory)")
     optParser.add_option("-i", "--ip", dest="ip",
@@ -76,10 +79,8 @@ def get_options():
                          help="Generate the o-d matrix for the traffic data", action="store_true")
     optParser.add_option("--generate_vehicles", dest="generate_vehicles",
                          help="Generate the vehicles distribution in time for the traffic data", action="store_true")
-    optParser.add_option("--veh-per-district", dest="veh_per_district",
-                         help="Vehicles per district file")
-    optParser.add_option("--kriging-ata-file", dest="kriging_ata_file",
-                         help="Kriging ata file")
+    optParser.add_option("--districts-file", dest="districts_file",
+                         help="Districts info file")
 
     (options, args) = optParser.parse_args()
 
@@ -118,7 +119,7 @@ def main_actions(options):
                 print(f'Execution time: {end - start}')
 
             elif options.generate_sim_files and options.dbPath and options.osmfile:
-                vehicles_distribution_dict = {"electric": 0.7, "hybrid": 3.93,"gasoline_b": 31.25, "gasoline_c": 21.08,
+                vehicles_distribution_dict = {"electric": 0.7, "hybrid": 3.93, "gasoline_b": 31.25, "gasoline_c": 21.08,
                                               "gas_oil_b": 34.23, "gas_oil_c": 23.09}
                 sim.write_simulation_files(sqlite3.connect(options.dbPath), name="scenario1_", sim_type="no_rr",
                                            vehicle_type_dict=vehicles_distribution_dict)
@@ -128,9 +129,6 @@ def main_actions(options):
         else:
             #    optParser.error('Server is not alive!!')
             tools.start_ABATIS(options)
-
-
-
 
 
 ############################

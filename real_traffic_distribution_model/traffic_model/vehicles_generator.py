@@ -12,9 +12,8 @@ sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 # generate random values from Poisson distribution with mean=3 and sample size=10
 
 PERIOD = 3600
-percentage = 50
+percentage = 75
 tolerated_error = 1.1
-
 
 
 def generate_vehicles_distribution(options):
@@ -35,7 +34,8 @@ def generate_vehicles_distribution(options):
     df_veh_per_route['src_edge'] = df_veh_per_route['route_id'].str.split('_to_').str[0]
     # Get the way id by getting the number in front of the hashtag
     df_veh_per_route['src_street'] = df_veh_per_route['src_edge'].str.split('#').str[0]
-    result = df_veh_per_route.groupby('src_street').agg({'n_vehicles': 'sum', 'route_id': 'unique', 'src_edge': 'unique'}).reset_index()
+    result = df_veh_per_route.groupby('src_street').agg(
+        {'n_vehicles': 'sum', 'route_id': 'unique', 'src_edge': 'unique'}).reset_index()
 
     # Drop the src_edge column
     result.drop(columns=['src_edge'], inplace=True)
@@ -101,7 +101,9 @@ def generate_vehicles_distribution(options):
                     'route': route_list}
     vehicle_df = pd.DataFrame.from_dict(vehicle_data)
     vehicle_df_clean = vehicle_df.drop_duplicates(subset=['vehicle_id'])
-    vehicle_df_clean.to_csv(f'/home/josedaniel/Modelo_distrib_trafico_real/vehicle_files/vehicle_data_{percentage}p_{tolerated_error}_net_edited_full.csv', index=False)
+    vehicle_df_clean.to_csv(
+        f'/home/josedaniel/Modelo_distrib_trafico_real/vehicle_files/vehicle_data_{percentage}p_{tolerated_error}_net_edited_full.csv',
+        index=False)
 
 
 def get_route_src_edge(route):
