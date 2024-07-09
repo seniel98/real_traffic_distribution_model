@@ -397,7 +397,7 @@ def create_kriging_df(data_array, min_lat, max_lat, min_lon, max_lon):
     kriging_df = create_dataframe(points)
 
     uk = OrdinaryKriging(data_array[:, 1], data_array[:, 0], data_array[:, 2], variogram_model="exponential",
-                         coordinates_type="geographic", verbose=True)
+                         coordinates_type="geographic")
     z, ss = uk.execute("points", points[:, 0], points[:, 1])
     # Reshape the interpolated data back to the original grid shape
     interpolated_vehicles = z.reshape((int(np.sqrt(len(z))), int(np.sqrt(len(z)))))

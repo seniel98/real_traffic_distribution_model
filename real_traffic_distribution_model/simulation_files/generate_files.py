@@ -143,11 +143,11 @@ def write_rou_file(cursor, name, sim_type, vehicle_type, vehicles, is_agg_file=F
         # Vehicle type emission class mapping
         emission_classes = {
             "gasoline_b": "HBEFA4/PC_petrol_Euro-3",
-            "gasoline_c": "HBEFA4/PC_petrol_Euro-5",
+            "gasoline_c": "HBEFA4/PC_petrol_Euro-6ab",
             "gas_oil_b": "HBEFA4/PC_diesel_Euro-4",
-            "gas_oil_c": "HBEFA4/PC_diesel_Euro-6c",
-            "hybrid": "HBEFA4/PC_PHEV_petrol_Euro-6d_(P)",
-            "electric": "Energy"
+            "gas_oil_c": "HBEFA4/PC_diesel_Euro-6ab",
+            "hybrid": "HBEFA4/PC_CNG_petrol_Euro-6_(CNG)",
+            "electric": "HBEFA4/PC_BEV"
         }
 
         if not is_agg_file:

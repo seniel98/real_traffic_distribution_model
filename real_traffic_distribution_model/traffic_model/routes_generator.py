@@ -7,6 +7,7 @@ from geopy.distance import geodesic
 from numpy.random import randint
 from tqdm import tqdm
 import sumolib as sumo
+import time
 
 sys.path.append("/home/josedaniel/real_traffic_distribution_model")
 
@@ -14,7 +15,7 @@ import real_traffic_distribution_model as rtdm
 
 is_reiterating = False
 selection_counts = {}
-percentage = 50
+percentage = 40
 tolerated_error = 1.1
 MAX_N_VEHICLES = 30000
 
@@ -44,7 +45,7 @@ def filter_not_suitable_edges(net, roundabouts):
     not_suitable_edges = []
     not_suitable_edges_set = set()
     for edge in net.getEdges():
-        if edge.getID() in roundabouts or edge.getLength() < 75 or edge.getType() == "highway.primary" or edge.getType() == "highway.motorway" or edge.getType() == "highway.primary_link" or edge.getType() == "highway.track" or edge.getType() == "highway.motorway_link":
+        if edge.getID() in roundabouts or edge.getLength() < 75 or "primary" in edge.getType() or "link" in edge.getType() or "track" in edge.getType() or "unclassified" in edge.getType():
             not_suitable_edges.append(str(edge.getID()))
 
     not_suitable_edges_set.update(not_suitable_edges)
@@ -54,7 +55,7 @@ def filter_not_suitable_edges(net, roundabouts):
 def filter_suited_edges(net, roundabouts):
     suited_rows = []  # List to hold all rows of edge_id and coord_node pairs
     for edge in net.getEdges():
-        if edge.getID() not in roundabouts and edge.getLength() > 75 and edge.getType() != "highway.primary" and edge.getType() != "highway.motorway "and edge.getType() != "highway.primary_link" and edge.getType() != "highway.track" and edge.getType() != "highway.motorway_link":
+        if edge.getID() not in roundabouts and edge.getLength() > 75 and "primary" not in edge.getType() and "link" not in edge.getType() and "track" not in edge.getType() and "unclassified" not in edge.getType():
             edge_id = str(edge.getID())
             for coord in edge.getRawShape():
                 # Convert the coordinates to lat, lon
@@ -144,7 +145,7 @@ def select_district(df, consider_population=False, src_district=None):
         population_prob = np.true_divide(abs_population, total_population)
 
         # Adjust selection probabilities by combining vehicle and population factors
-        selection_prob = (selection_prob + population_prob) / 2
+        selection_prob = (selection_prob + population_prob * 2) / 2
         selection_prob /= np.sum(selection_prob)  # Normalize probabilities
     # Penalize selection probabilities based on previous selections
     for i, district in enumerate(district_list):
@@ -342,7 +343,10 @@ def create_od_routes(options, net):
     route_list = []
     coord_route_list = []
     global_ata_list = []
+    exec_time_list = []
     routes_count = 0
+    is_reiterating = False
+    start_time = time.time()
 
     traffic_df = pd.read_csv(options.traffic_file)
     districts_df = pd.read_csv(options.districts_file)
@@ -401,8 +405,12 @@ def create_od_routes(options, net):
 
     pbar = tqdm(total=int((total_vehicles_copy * (percentage / 100))))
 
-    while total_vehicles > int(
-            (total_vehicles_copy * (1 - (percentage / 100)))) and routes_count < max_n_vehicles_percentage:
+    while total_vehicles > int((total_vehicles_copy * (1 - (percentage / 100)))) and routes_count < max_n_vehicles_percentage:
+
+        if not is_reiterating:
+            if not routes_count == 0:
+                start_time = time.time()
+
         src_point, src_district = select_origin_destination_from_kriging(options, kriging_ata_df,
                                                                          veh_per_district_df)
 
@@ -428,6 +436,7 @@ def create_od_routes(options, net):
                         route_ata_list.add(ata)
                     else:
                         is_n_vehicles_exceeded = True
+                        is_reiterating = True
                         break
 
             if not is_n_vehicles_exceeded:
@@ -455,6 +464,7 @@ def create_od_routes(options, net):
 
                 # Generate a new veh_per_district_df every 1000 routes
                 if routes_count % 1000 == 0 and routes_count != 0:
+                    print(f'{routes_count} routes generated so far...')
                     kriging_ata_df = process_kriging_ata_df(districts_gdf, traffic_df, max_point, min_point,
                                                             suitable_edges_df)
                     veh_per_district_df = create_veh_per_district_df(kriging_ata_df)
@@ -463,20 +473,25 @@ def create_od_routes(options, net):
                     kriging_ata_df.to_csv("/home/josedaniel/Algoritmo_rutas_eco/kriging_ata_df_end.csv", index=False)
 
                 pbar.update(len(route_ata_list))
+                exec_time_list.append(time.time() - start_time)
 
                 is_reiterating = False
                 routes_count += 1
+            else:
+                is_reiterating = True
+        else:
+            is_reiterating = True
 
     db_path_conn.close()
     traffic_db_conn.close()
     print(f'Total v{percentage}p_{tolerated_error} routes generated: {len(route_list)}')
     gen_routes_data = {'route_id': route_id_list, 'route': route_list, 'coord': coord_route_list,
-                       'ATA': global_ata_list}
+                       'ATA': global_ata_list, 'exec_time': exec_time_list}
     gen_routes_df = pd.DataFrame.from_dict(gen_routes_data)
     gen_routes_df.to_csv(
         f'/home/josedaniel/Modelo_distrib_trafico_real/routes_data/gen_routes_data_{str(percentage)}p_{str(tolerated_error)}_net_edited_kr.csv',
         index=False)
-    gen_routes_df.drop(columns={"coord"}, inplace=True)
+    gen_routes_df.drop(columns={"coord", "exec_time"}, inplace=True)
     gen_routes_df_clean = gen_routes_df['route_id'].value_counts().to_frame().reset_index()
     gen_routes_df_clean.rename(columns={'index': 'route_id', 'route_id': 'n_vehicles'}, inplace=True)
     gen_routes_df_clean.to_csv(
